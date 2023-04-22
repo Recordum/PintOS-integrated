@@ -109,6 +109,7 @@ thread_init (void) {
 	/* Init the globla thread context */
 	lock_init (&tid_lock);
 	list_init (&ready_list);
+	list_init (&sleep_list);
 	list_init (&destruction_req);
 
 	/* Set up a thread structure for the running thread. */
@@ -317,7 +318,7 @@ thread_sleep (int64_t start, int64_t ticks) {
 	cur_thread->wake_time = start + ticks;
 	list_push_back(&sleep_list, &cur_thread->elem);
 	do_schedule(THREAD_BLOCKED);
-	
+
 	intr_set_level(old_level);
 }
 
