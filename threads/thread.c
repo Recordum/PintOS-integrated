@@ -324,14 +324,14 @@ thread_sleep (int64_t start, int64_t ticks) {
 }
 
 void
-wake_thread(int64_t ticks) {
+thread_wake(int64_t ticks) {
 	enum intr_level old_level;
 
 	old_level = intr_disable();
 	if (!list_empty(&sleep_list)){
 		return;
 	}
-	
+
 	struct thread* awake_thread = list_entry (list_front (&sleep_list), struct thread, elem);
 	if(awake_thread->wake_time <= ticks){
 		struct thread* to_ready_thread = list_entry(list_pop_front(&sleep_list), struct thread, elem);
