@@ -317,6 +317,7 @@ thread_sleep (int64_t start, int64_t ticks) {
 	cur_thread->wake_time = start + ticks;
 	list_push_back(&sleep_list, &cur_thread->elem);
 	do_schedule(THREAD_BLOCKED);
+	
 	intr_set_level(old_level);
 }
 
