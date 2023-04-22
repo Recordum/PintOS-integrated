@@ -309,6 +309,7 @@ thread_yield (void) {
 	do_schedule (THREAD_READY);
 	intr_set_level (old_level);
 }
+
 void
 thread_sleep (int64_t start, int64_t ticks) {
 	enum intr_level old_level;
@@ -320,6 +321,25 @@ thread_sleep (int64_t start, int64_t ticks) {
 	do_schedule(THREAD_BLOCKED);
 
 	intr_set_level(old_level);
+}
+
+void
+wake_thread(int64_t ticks) {
+	enum intr_level old_level;
+
+	old_level = intr_disable();
+	if (!list_empty(&sleep_list)){
+		return;
+	}
+	
+	struct thread* awake_thread = list_entry (list_front (&sleep_list), struct thread, elem);
+	if(awake_thread->wake_time <= ticks){
+		struct thread* to_ready_thread = list_entry(list_pop_front(&sleep_list), struct thread, elem);
+		list_push_back(&ready_list, &to_ready_thread->elem);
+	}
+
+	intr_set_level(old_level);
+
 }
 
 /* Sets the current thread's priority to NEW_PRIORITY. */
