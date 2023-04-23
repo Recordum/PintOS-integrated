@@ -28,6 +28,7 @@
    that are ready to run but not actually running. */
 static struct list ready_list;
 
+static struct list sleep_list;
 /* Idle thread. */
 static struct thread *idle_thread;
 
@@ -108,6 +109,7 @@ thread_init (void) {
 	/* Init the globla thread context */
 	lock_init (&tid_lock);
 	list_init (&ready_list);
+	list_init (&sleep_list);
 	list_init (&destruction_req);
 
 	/* Set up a thread structure for the running thread. */
@@ -298,7 +300,7 @@ void
 thread_yield (void) {
 	struct thread *curr = thread_current ();
 	enum intr_level old_level;
-
+	
 	ASSERT (!intr_context ());
 
 	old_level = intr_disable ();
@@ -306,6 +308,38 @@ thread_yield (void) {
 		list_push_back (&ready_list, &curr->elem);
 	do_schedule (THREAD_READY);
 	intr_set_level (old_level);
+}
+
+void
+thread_sleep (int64_t start, int64_t ticks) {
+	enum intr_level old_level;
+	struct thread* cur_thread = thread_current();
+
+	old_level = intr_disable ();
+	cur_thread->wake_time = start + ticks;
+	list_push_back(&sleep_list, &cur_thread->elem);
+	do_schedule(THREAD_BLOCKED);
+
+	intr_set_level(old_level);
+}
+
+void
+thread_wake(int64_t ticks) {
+	enum intr_level old_level;
+
+	old_level = intr_disable();
+	if (!list_empty(&sleep_list)){
+		return;
+	}
+
+	struct thread* awake_thread = list_entry (list_front (&sleep_list), struct thread, elem);
+	if(awake_thread->wake_time <= ticks){
+		struct thread* to_ready_thread = list_entry(list_pop_front(&sleep_list), struct thread, elem);
+		list_push_back(&ready_list, &to_ready_thread->elem);
+	}
+
+	intr_set_level(old_level);
+
 }
 
 /* Sets the current thread's priority to NEW_PRIORITY. */
@@ -538,7 +572,7 @@ do_schedule(int status) {
 	schedule ();
 }
 
-static void
+static void	
 schedule (void) {
 	struct thread *curr = running_thread ();
 	struct thread *next = next_thread_to_run ();
@@ -550,6 +584,7 @@ schedule (void) {
 	next->status = THREAD_RUNNING;
 
 	/* Start new time slice. */
+
 	thread_ticks = 0;
 
 #ifdef USERPROG
