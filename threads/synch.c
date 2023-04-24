@@ -31,7 +31,7 @@
 #include <string.h>
 #include "threads/interrupt.h"
 #include "threads/thread.h"
-
+bool high_function(const struct list_elem *first, const struct list_elem *second, void *aux UNUSED);
 /* Initializes semaphore SEMA to VALUE.  A semaphore is a
    nonnegative integer along with two atomic operators for
    manipulating it:
@@ -67,10 +67,18 @@ sema_down (struct semaphore *sema) {
 	old_level = intr_disable ();
 	while (sema->value == 0) {
 		list_push_back (&sema->waiters, &thread_current ()->elem);
+		list_sort(&sema->waiters, high_function, NULL);
 		thread_block ();
 	}
 	sema->value--;
 	intr_set_level (old_level);
+}
+
+bool
+high_function(const struct list_elem *first, const struct list_elem *second, void *aux UNUSED){
+	const struct thread *thread_first = list_entry(first, struct thread, elem);
+	const struct thread *thread_second = list_entry(second, struct thread, elem);
+	return thread_first->priority > thread_second->priority;
 }
 
 /* Down or "P" operation on a semaphore, but only if the
@@ -109,10 +117,11 @@ sema_up (struct semaphore *sema) {
 	ASSERT (sema != NULL);
 
 	old_level = intr_disable ();
-	if (!list_empty (&sema->waiters))
+	sema->value++;
+	if (!list_empty (&sema->waiters)){
 		thread_unblock (list_entry (list_pop_front (&sema->waiters),
 					struct thread, elem));
-	sema->value++;
+	}
 	intr_set_level (old_level);
 }
 
@@ -187,10 +196,15 @@ lock_acquire (struct lock *lock) {
 	ASSERT (lock != NULL);
 	ASSERT (!intr_context ());
 	ASSERT (!lock_held_by_current_thread (lock));
-
+	if(lock->holder != NULL){
+		if(lock->holder->priority < thread_current()->priority){
+			donate(thread_current(), lock);
+		}
+	}
 	sema_down (&lock->semaphore);
 	lock->holder = thread_current ();
 }
+
 
 /* Tries to acquires LOCK and returns true if successful or false
    on failure.  The lock must not already be held by the current
