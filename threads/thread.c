@@ -248,7 +248,10 @@ thread_unblock (struct thread *t) {
 	int priority_in_ready_list = list_entry(list_front(&ready_list), struct thread, elem)->priority;
 	if(thread_current() != idle_thread){
 		if (thread_current()->priority < priority_in_ready_list){
-			thread_yield();
+			old_level = intr_disable ();
+			do_schedule (THREAD_READY);
+			intr_set_level (old_level);
+			// thread_yield();
 		}
 	}
 	intr_set_level (old_level);
@@ -495,7 +498,9 @@ next_thread_to_run (void) {
 static struct thread *
 find_high_priority_thread(){
 	list_sort(&ready_list, high_priority_function, NULL);
-	
+	struct thread* first = list_entry(list_begin(&ready_list), struct thread, elem);
+	struct list_elem *first_elem = list_begin(&ready_list);
+	// struct thread* second = list_entry(list_next(list_begin(&ready_list)), struct thread, elem);
 	return list_entry(list_pop_front(&ready_list), struct thread, elem);
 }
 

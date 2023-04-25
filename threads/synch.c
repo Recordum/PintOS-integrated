@@ -270,10 +270,10 @@ lock_release (struct lock *lock) {
 				while(1){
 					if (priority_check == list_entry(cur_element, struct thread, priority_elem)){
 						list_remove(cur_element);
+						current_thread->priority = list_entry(list_begin(&current_thread->priority_list), struct thread, priority_elem) -> priority;
 						break;
-						}
-					cur_element = list_next(cur_element);	
-					current_thread->priority = list_entry(list_begin(&current_thread->priority_list), struct thread, priority_elem) -> priority;		
+					}
+					cur_element = list_next(cur_element);		
 				}
 			}
 		}
