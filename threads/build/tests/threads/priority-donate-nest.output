@@ -1,0 +1,19 @@
+Kernel command line: -q run priority-donate-nest
+0 ~ 9fc00 1
+100000 ~ 13e0000 1
+Pintos booting with: 
+	base_mem: 0x0 ~ 0x9fc00 (Usable: 639 kB)
+	ext_mem: 0x100000 ~ 0x13e0000 (Usable: 19,328 kB)
+Calibrating timer...  52,377,600 loops/s.
+Boot complete.
+Executing 'priority-donate-nest':
+(priority-donate-nest) begin
+(priority-donate-nest) Low thread should have priority 32.  Actual priority: 32.
+Kernel PANIC at ../../threads/thread.c:632 in schedule(): assertion `is_thread (next)' failed.
+Call stack: 0x8004213984 0x8004207b0c 0x8004206d16 0x8004209b79 0x800420a092 0x8004218a63 0x80042074cf.
+The `backtrace' program can make call stacks useful.
+Read "Backtraces" in the "Debugging Tools" chapter
+of the Pintos documentation for more information.
+Timer: 20 ticks
+Thread: 0 idle ticks, 20 kernel ticks, 0 user ticks
+Console: 

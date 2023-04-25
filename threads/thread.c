@@ -65,8 +65,6 @@ static void schedule (void);
 static tid_t allocate_tid (void);
 static struct thread *find_high_priority_thread();
 bool high_priority_function(const struct list_elem *first, const struct list_elem *second, void *aux UNUSED);
-void donate(struct thread* current_thread, struct lock *lock);
-void donate_to_lock_list(struct thread* current_thread, struct lock *lock);
 /* Returns true if T appears to point to a valid thread. */
 #define is_thread(t) ((t) != NULL && (t)->magic == THREAD_MAGIC)
 
@@ -474,10 +472,10 @@ init_thread (struct thread *t, const char *name, int priority) {
 	t->tf.rsp = (uint64_t) t + PGSIZE - sizeof (void *);
 	t->priority = priority;
 	t->magic = THREAD_MAGIC;
+	t->wait_lock = NULL;
+	t->origin_priority = priority;
 	list_init(&t->priority_list);
-	list_init(&t->lock_list);
-
-	list_push_back(&t->priority_list, &t->priority_elem);
+	list_init(&t->possesion_lock_list);
 }
 
 /* Chooses and returns the next thread to be scheduled.  Should
@@ -676,30 +674,3 @@ allocate_tid (void) {
 	return tid;
 }
 
-void
-donate(struct thread* current_thread, struct lock *lock){
-	lock->holder->priority = current_thread->priority;
-	if (!list_empty(&(lock->holder->lock_list))){
-		donate_to_lock_list(current_thread, lock);
-	}
-	
-	list_push_back(&(current_thread->lock_list), &(lock->holder->lock_elem));
-	list_insert_ordered(&(lock->holder->priority_list), &(current_thread->priority_elem), high_priority_function, NULL);
-	lock->holder->priority = list_begin(&lock->holder->priority_list);
-}
-
-void
-donate_to_lock_list(struct thread* current_thread, struct lock *lock){
-	struct list_elem *recipient = list_front(&lock->holder->lock_list);
-	struct list_elem *end = list_end(&lock->holder->lock_list);
-	while(1){
-		if (recipient == end){
-			return;
-		}
-		struct thread* recipient_thread = list_entry(recipient, struct thread, lock_elem);
-		list_insert_ordered(&(recipient_thread->priority_list), &current_thread->priority_elem, high_priority_function, NULL);
-		recipient_thread->priority = list_begin(&recipient_thread->priority_list);
-		
-		recipient = list_next(&recipient);
-	}
-}
