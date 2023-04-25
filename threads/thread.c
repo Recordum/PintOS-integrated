@@ -474,6 +474,10 @@ init_thread (struct thread *t, const char *name, int priority) {
 	t->tf.rsp = (uint64_t) t + PGSIZE - sizeof (void *);
 	t->priority = priority;
 	t->magic = THREAD_MAGIC;
+	list_init(&t->priority_list);
+	list_init(&t->lock_list);
+
+	list_push_back(&t->priority_list, &t->priority_elem);
 }
 
 /* Chooses and returns the next thread to be scheduled.  Should
@@ -680,6 +684,8 @@ donate(struct thread* current_thread, struct lock *lock){
 	}
 	
 	list_push_back(&(current_thread->lock_list), &(lock->holder->lock_elem));
+	list_insert_ordered(&(lock->holder->priority_list), &(current_thread->priority_elem), high_priority_function, NULL);
+	lock->holder->priority = list_begin(&lock->holder->priority_list);
 }
 
 void
@@ -690,8 +696,10 @@ donate_to_lock_list(struct thread* current_thread, struct lock *lock){
 		if (recipient == end){
 			return;
 		}
-		list_entry(recipient, struct thread, lock_elem)->priority = current_thread->priority;
+		struct thread* recipient_thread = list_entry(recipient, struct thread, lock_elem);
+		list_insert_ordered(&(recipient_thread->priority_list), &current_thread->priority_elem, high_priority_function, NULL);
+		recipient_thread->priority = list_begin(&recipient_thread->priority_list);
 		
-		recipient = list_entry(list_next(&recipient->elem), struct thread, lock_elem);
+		recipient = list_next(&recipient);
 	}
 }
