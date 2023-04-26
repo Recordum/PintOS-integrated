@@ -248,10 +248,10 @@ thread_unblock (struct thread *t) {
 	int priority_in_ready_list = list_entry(list_front(&ready_list), struct thread, elem)->priority;
 	if(thread_current() != idle_thread){
 		if (thread_current()->priority < priority_in_ready_list){
-			old_level = intr_disable ();
-			do_schedule (THREAD_READY);
-			intr_set_level (old_level);
-			// thread_yield();
+			// old_level = intr_disable ();
+			// do_schedule (THREAD_READY);
+			// intr_set_level (old_level);
+			thread_yield();
 		}
 	}
 	intr_set_level (old_level);
@@ -366,7 +366,13 @@ thread_wake(int64_t ticks) {
 /* Sets the current thread's priority to NEW_PRIORITY. */
 void
 thread_set_priority (int new_priority) {
-	thread_current ()->priority = new_priority;
+	struct thread* current_thread = thread_current();
+	if ( list_size(&current_thread->priority_list) == 0){
+		current_thread->priority = new_priority;
+	}
+
+	current_thread->origin_priority = new_priority;
+	
 	if (list_empty(&ready_list)){
 		return;
 	}
