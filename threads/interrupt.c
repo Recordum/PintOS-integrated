@@ -59,7 +59,7 @@ static struct desc_ptr idt_desc = {
 };
 
 
-#define make_gate(g, function, d, t) \
+#define make_gate(g, function, d, t) \ 
 { \
 	ASSERT ((function) != NULL); \
 	ASSERT ((d) >= 0 && (d) <= 3); \

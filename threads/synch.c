@@ -32,8 +32,15 @@
 #include <string.h>
 #include "threads/interrupt.h"
 #include "threads/thread.h"
+#include "debug.h"
+/* declaration function */
 void donate(struct thread* current_thread, struct lock *lock);
 bool high_function(const struct list_elem *first, const struct list_elem *second, void *aux UNUSED);
+void give_back_prioirty(struct lock *lock, struct thread *current_thread);
+bool has_not_lock(struct thread *current_thread);
+void set_thread_priority_to_origin(struct thread *current_thread, struct thread *priority_check);
+void remove_priority_list(struct thread *current_thread, struct thread *priority_check);
+
 /* Initializes semaphore SEMA to VALUE.  A semaphore is a
    nonnegative integer along with two atomic operators for
    manipulating it:
@@ -197,7 +204,7 @@ lock_acquire (struct lock *lock) {
 	ASSERT (lock != NULL);
 	ASSERT (!intr_context ());
 	ASSERT (!lock_held_by_current_thread (lock));
-	if(lock->holder != NULL && thread_current != idle_thread){
+	if(lock->holder != NULL){
 		if(lock->holder->priority < thread_current()->priority){
 			thread_current()->wait_lock = lock;
 			donate(thread_current(), lock);
@@ -258,38 +265,57 @@ lock_release (struct lock *lock) {
 	ASSERT (lock_held_by_current_thread (lock));
 	struct thread* current_thread = thread_current();
 	list_remove(&lock->lock_elem);
-	if (current_thread != idle_thread){
-		if (!list_empty (&lock->semaphore.waiters)){
-			struct thread* priority_check = list_entry(list_begin(&((&lock->semaphore)->waiters)), struct thread, elem);
-			priority_check->wait_lock = NULL;
-			if (list_size(&(current_thread->possesion_lock_list)) == 0){
-				while(1){
-					if (list_begin(&(current_thread->priority_list)) == list_end(&(current_thread->priority_list))){
-						current_thread->priority = current_thread->origin_priority;
-						break;
-					}
-					struct list_elem *priority_elem = list_pop_front(&(current_thread->priority_list));
-					if (priority_elem != &(priority_check->priority_elem)){
-						list_push_front(&(priority_check->priority_list), priority_elem);
-					}	
-					// / current_thread->priority = list_entry(list_begin(&current_thread->priority_list), struct thread, priority_elem) -> priority;
-				}
-			}else{
-				struct list_elem* cur_element = list_begin(&(current_thread->priority_list));
-				while(1){
-					if (priority_check == list_entry(cur_element, struct thread, priority_elem)){
-						list_remove(cur_element);
-						current_thread->priority = list_entry(list_begin(&current_thread->priority_list), struct thread, priority_elem) -> priority;
-						break;
-					}
-					cur_element = list_next(cur_element);		
-				}
-			}
-		}
+	if(current_thread != idle_thread){
+		give_back_prioirty(lock, current_thread);
 	}
 	lock->holder = NULL;
 	sema_up (&lock->semaphore);
 
+}
+
+void
+give_back_prioirty(struct lock *lock, struct thread *current_thread){
+	if (!list_empty (&lock->semaphore.waiters)){
+		struct thread* priority_check = list_entry(list_begin(&((&lock->semaphore)->waiters)), struct thread, elem);
+		priority_check->wait_lock = NULL;
+		if (has_not_lock(current_thread)){
+			set_thread_priority_to_origin(current_thread, priority_check);
+			return;
+		}
+		remove_priority_list(current_thread, priority_check);
+	}
+}
+
+bool
+has_not_lock(struct thread *current_thread){
+	return list_size(&(current_thread->possesion_lock_list)) == 0;
+}
+
+void
+set_thread_priority_to_origin(struct thread *current_thread, struct thread *priority_check){
+	while(true){
+		if (list_begin(&(current_thread->priority_list)) == list_end(&(current_thread->priority_list))){
+			current_thread->priority = current_thread->origin_priority;
+			return;
+		}
+		struct list_elem *priority_elem = list_pop_front(&(current_thread->priority_list));
+		if (priority_elem != &(priority_check->priority_elem)){
+			list_push_front(&(priority_check->priority_list), priority_elem);
+		}			
+	}
+}
+
+void
+remove_priority_list(struct thread *current_thread, struct thread *priority_check){
+	struct list_elem* cur_element = list_begin(&(current_thread->priority_list));
+	while(true){
+		if (priority_check == list_entry(cur_element, struct thread, priority_elem)){
+			list_remove(cur_element);
+			current_thread->priority = list_entry(list_begin(&current_thread->priority_list), struct thread, priority_elem) -> priority;
+			return;
+			}
+		cur_element = list_next(cur_element);		
+	}		
 }
 /* Compare function for priority queue */
 bool

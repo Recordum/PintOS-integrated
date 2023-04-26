@@ -240,20 +240,16 @@ thread_unblock (struct thread *t) {
 	enum intr_level old_level;
 
 	ASSERT (is_thread (t));
-
 	old_level = intr_disable ();
 	ASSERT (t->status == THREAD_BLOCKED);
 	list_push_back (&ready_list, &t->elem);
 	list_sort(&ready_list, high_priority_function, NULL);
 	int priority_in_ready_list = list_entry(list_front(&ready_list), struct thread, elem)->priority;
-	if(thread_current() != idle_thread){
-		if (thread_current()->priority < priority_in_ready_list){
-			// old_level = intr_disable ();
-			// do_schedule (THREAD_READY);
-			// intr_set_level (old_level);
-			thread_yield();
-		}
+	
+	if (thread_current()->priority < priority_in_ready_list && thread_current() != idle_thread){
+		thread_yield();
 	}
+	
 	intr_set_level (old_level);
 }
 
@@ -378,11 +374,11 @@ thread_set_priority (int new_priority) {
 	}
 	list_sort(&ready_list, high_priority_function, NULL);
 	int priority_in_ready_list = list_entry(list_front(&ready_list), struct thread, elem)->priority;
-	if(thread_current() != idle_thread){
-		if (thread_current()->priority < priority_in_ready_list){
-			thread_yield();
-		}
+	
+	if (thread_current()->priority < priority_in_ready_list && thread_current() != idle_thread){
+		thread_yield();
 	}
+	
 	
 }
 
@@ -506,7 +502,6 @@ find_high_priority_thread(){
 	list_sort(&ready_list, high_priority_function, NULL);
 	struct thread* first = list_entry(list_begin(&ready_list), struct thread, elem);
 	struct list_elem *first_elem = list_begin(&ready_list);
-	// struct thread* second = list_entry(list_next(list_begin(&ready_list)), struct thread, elem);
 	return list_entry(list_pop_front(&ready_list), struct thread, elem);
 }
 
