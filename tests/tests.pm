@@ -22,7 +22,6 @@ for my $prereq_test (@prereq_tests) {
     fail "Prerequisite test $prereq_test failed.\n" if $result[0] ne 'PASS';
 }
 
-
 # Generic testing.
 
 sub check_expected {

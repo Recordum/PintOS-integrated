@@ -81,7 +81,7 @@ main (void) {
 	   then enable console locking. */
 	thread_init ();
 	console_init ();
-
+	struct thread* current_thread = thread_current();
 	/* Initialize memory system. */
 	mem_end = palloc_init ();
 	malloc_init ();
