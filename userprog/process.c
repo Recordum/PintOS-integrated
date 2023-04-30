@@ -26,7 +26,7 @@ static void process_cleanup (void);
 static bool load (const char *file_name, struct intr_frame *if_);
 static void initd (void *f_name);
 static void __do_fork (void *);
-
+void  push_argument(char **argv, int argc, struct intr_frame *_if);
 /* General process initializer for initd and other process. */
 static void
 process_init (void) {
@@ -162,31 +162,90 @@ error:
  * Returns -1 on fail. */
 int
 process_exec (void *f_name) {
-	char *file_name = f_name;
+	char *file_name = f_name;  // 함수의 인자로 전달받은 프로그램 이름을 file_name 변수에 저장
 	bool success;
+	char *token, *save_ptr;
 
 	/* We cannot use the intr_frame in the thread structure.
 	 * This is because when current thread rescheduled,
 	 * it stores the execution information to the member. */
-	struct intr_frame _if;
-	_if.ds = _if.es = _if.ss = SEL_UDSEG;
-	_if.cs = SEL_UCSEG;
-	_if.eflags = FLAG_IF | FLAG_MBS;
+	struct intr_frame _if;						// 구조체를 선언하고, 다음과 같이 초기화
+	_if.ds = _if.es = _if.ss = SEL_UDSEG;		// 데이터 세그먼트, 스택 세그먼트, 익스큐션 세그먼트 등의 값은 사용하지 않으므로 SEL_UDSEG로 설정
+	_if.cs = SEL_UCSEG;							// 코드 세그먼트는 SEL_UCSEG로 설정
+	_if.eflags = FLAG_IF | FLAG_MBS;			// 인터럽트 가능 플래그(FLAG_IF)와 메모리 경계 검사 플래그(FLAG_MBS)를 설정
 
 	/* We first kill the current context */
-	process_cleanup ();
+	process_cleanup ();							// 현재 실행 중인 프로세스를 종료
+
+	char *argv[128]; // 인자들을 저장할 argv 배열을 선언
+    int argc = 0;   // 전달할 인자의 개수를 저장할 변수 argc를 선언
+
+	/* strtok_r 함수를 사용하여 file_name 문자열에서 공백(" ")을 구분자로 하여 문자열을 파싱 
+	strtok_r은 첫 번째 호출 시 첫 번째 인자로 전달한 문자열에서 구분자를 찾아 그 위치를 기준으로 문자열을 분리한다.
+	이후에는 NULL을 전달하여 분리된 문자열을 계속 탐색합니다. 이렇게 분리된 문자열들은 token 변수에 저장된다.*/
+	for (token = strtok_r(file_name, " ", &save_ptr); token != NULL; token = strtok_r(NULL, " ", &save_ptr))
+    {																			
+        argv[argc] = token;			// 배열에 token 값을 저장합니다.
+        argc++;						// argc 변수의 값을 1 증가 
+    }
+
 
 	/* And then load the binary */
 	success = load (file_name, &_if);
 
+	push_argument(argv, argc, &_if);
+	/*USER_STACK - (uint64_t)_if.rsp는 유저 스택의 크기에서 현재 스택 포인터 _if.rsp가 위치한 주소를 빼서, 현재 유저 스택에 저장된 내용을 덤프하는 것*/
+	hex_dump(_if.rsp, _if.rsp, USER_STACK - (uint64_t)_if.rsp, true);
 	/* If load failed, quit. */
-	palloc_free_page (file_name);
-	if (!success)
+	palloc_free_page (file_name);	// file_name 문자열이 저장된 페이지를 해제
+	if (!success)					// 프로그램 로드에 실패한 경우 -1을 반환하고 함수를 종료
 		return -1;
-
+	
 	/* Start switched process. */
-	do_iret (&_if);
+	do_iret (&_if);					// do_iret 함수를 호출하여 intr_frame 구조체 _if에 저장된 정보를 바탕으로 새로운 프로세스를 실행
 	NOT_REACHED ();
+}
+
+void 
+push_argument(char **argv, int argc, struct intr_frame *_if){
+	int padding;
+	
+	// 파싱한 인자들을 argument stack에 삽입
+	for(int i = argc -1; i>=0; i--)
+	{	
+		// 스택 포인터를 문자열 길이 + 1 만큼 이동시킴 (1은 NULL 문자를 위한 공간)
+		_if->rsp -= (strlen(argv[i]) +1);
+		// 인자 값을 argument stack에 복사
+		memcpy(_if->rsp,argv[i],strlen(argv[i]) +1);
+		// 인자의 주소를 저장하기 위해 argv 배열의 해당 인덱스에 저장
+		argv[i] = (char*)_if->rsp;
+	}
+
+	// 스택 포인터를 8의 배수로 맞추기 위한 패딩 처리
+	if(_if->rsp % 8)
+	{
+		padding = _if->rsp % 8;
+		_if->rsp -= padding;
+		memset(_if->rsp,0,padding);
+	}
+
+	// 스택에 8바이트 크기의 공간을 추가하고, 0으로 채움
+	_if->rsp -= 8;
+	memset(_if->rsp,0,8);
+
+	// 인자의 주소들을 push
+	for(int i=argc-1; i>=0; i--){
+		_if->rsp -= 8;
+		// 인자의 주소를 argument stack에 저장
+		memcpy(_if->rsp,&argv[i],8);
+	}
+
+	// 스택에 8바이트 크기의 공간을 추가하고, 0으로 채움
+	_if->rsp -= 8;
+	memset(_if->rsp,0,8);
+
+	_if->R.rdi = argc; 				// rdi 레지스터에 argc 값을 저장
+	_if->R.rsi = _if->rsp + 8;		// rsi 레지스터에 argv 배열의 첫 번째 인자의 주소 값을 저장	
 }
 
 
@@ -201,6 +260,7 @@ process_exec (void *f_name) {
  * does nothing. */
 int
 process_wait (tid_t child_tid UNUSED) {
+	while(1){}
 	/* XXX: Hint) The pintos exit if process_wait (initd), we recommend you
 	 * XXX:       to add infinite loop here before
 	 * XXX:       implementing the process_wait. */
