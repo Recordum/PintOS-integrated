@@ -179,7 +179,6 @@ process_exec (void *f_name) {
 	_if.cs = SEL_UCSEG;
 	_if.eflags = FLAG_IF | FLAG_MBS;
 	
-
 	/* We first kill the current context */
 	process_cleanup ();
 	
@@ -204,9 +203,9 @@ process_exec (void *f_name) {
 	if (!success)
 	//thread_exit()
 		return -1;
-	hex_dump(_if.rsp, _if.rsp, KERN_BASE - _if.rsp, true);
+	hex_dump(_if.rsp, _if.rsp, USER_STACK - (uint64_t)_if.rsp, true);
 	//missing_part;
-
+	uint64_t syscall_number = _if.R.rax;
 	/* Start switched process. */
 	do_iret (&_if);
 	NOT_REACHED ();
@@ -246,7 +245,7 @@ push_argument(char** argv, int argc, struct intr_frame *_if){
 
 	_if->R.rdi = argc;
 	_if->R.rsi = _if->rsp + sizeof(void*);
-
+	
 	// hex_dump(_if->rsp, _if->rsp, KERN_BASE - _if->rsp, true);
 }
 
@@ -263,7 +262,9 @@ push_argument(char** argv, int argc, struct intr_frame *_if){
  * does nothing. */
 int
 process_wait (tid_t child_tid UNUSED) {
+	
 	while(1){
+
 	}
 	/* XXX: Hint) The pintos exit if process_wait (initd), we recommend you
 	 * XXX:       to add infinite loop here before

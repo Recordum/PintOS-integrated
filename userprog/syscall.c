@@ -10,7 +10,8 @@
 
 void syscall_entry (void);
 void syscall_handler (struct intr_frame *);
-
+void halt();
+void exit(int status);
 /* System call.
  *
  * Previously system call services was handled by the interrupt handler
@@ -40,20 +41,66 @@ syscall_init (void) {
 // intr_register_int (0x30, 3, INTR_ON, syscall_handler, "syscall");
 /* The main system call interface */
 void
-syscall_handler (struct intr_frame *f UNUSED) {
+syscall_handler (struct intr_frame *f) {
 	// TODO: Your implementation goes here.
 	// syscall_number에 따라 systemcall(HALT,exec,./..)
-	int *syscall_number = (char*)f->rsp - sizeof(int);
-	switch (*syscall_number)
+	/*check validation*/
+	struct thread* curr = thread_current();
+	uint64_t syscall_number = f->R.rax;
+	uint64_t rsp = f->rsp;
+	uint64_t ARG0 = f->R.rdi;
+	uint64_t ARG1 = f->R.rsi;
+	uint64_t ARG2 = f->R.rdx;
+	uint64_t ARG3 = f->R.r10;
+	uint64_t ARG4 = f->R.r8;
+	uint64_t ARG5 = f->R.r9;
+
+	switch (syscall_number)
 	{
-	case /* constant-expression */:
-		/* code */
+	case SYS_HALT:
+		halt();
 		break;
-	
-	default:
+	case SYS_EXIT:
+		exit(ARG0);
+		break;
+	case SYS_FORK:
+		break;
+	case SYS_EXEC:
+		break;
+	case SYS_WAIT:
+		break;
+	case SYS_CREATE:
+		break;
+	case SYS_REMOVE:
+		break;
+	case SYS_OPEN:
+		break;
+	case SYS_FILESIZE:
+		break;
+	case SYS_READ:
+		break;
+	case SYS_WRITE:
+		printf("write here\n");
+		break;
+	case SYS_SEEK:
+		break;
+	case SYS_TELL:
+		break;
+	case SYS_CLOSE:
 		break;
 	}
 
 	printf ("system call!\n");
-	thread_exit ();
+// 	thread_exit ();
+}
+
+void
+halt(){
+	power_off();
+}
+
+void
+exit(int status){
+	thread_exit();
+	printf("Name of process: exit(%d)\n", status);
 }
