@@ -22,10 +22,11 @@
 #include "vm/vm.h"
 #endif
 
-static void process_cleanup (void);
+static void process_cleanup (evoid);
 static bool load (const char *file_name, struct intr_frame *if_);
 static void initd (void *f_name);
 static void __do_fork (void *);
+void push_argument(char **argv, int argc, struct intr_frame *_if);
 
 /* General process initializer for initd and other process. */
 static void
@@ -42,7 +43,7 @@ tid_t
 process_create_initd (const char *file_name) {
 	char *fn_copy;
 	tid_t tid;
-
+	/*parse_file_name*/
 	/* Make a copy of FILE_NAME.
 	 * Otherwise there's a race between the caller and load(). */
 	fn_copy = palloc_get_page (0);
@@ -162,9 +163,14 @@ error:
  * Returns -1 on fail. */
 int
 process_exec (void *f_name) {
-	char *file_name = f_name;
+	const int MAX_ARGUMENTS = 128;
+	char *input_str = f_name;
+	char *file_name;
 	bool success;
-
+	char *token;
+	int argc = 0;
+	char *saveptr;
+	char *argv[MAX_ARGUMENTS];
 	/* We cannot use the intr_frame in the thread structure.
 	 * This is because when current thread rescheduled,
 	 * it stores the execution information to the member. */
@@ -172,22 +178,78 @@ process_exec (void *f_name) {
 	_if.ds = _if.es = _if.ss = SEL_UDSEG;
 	_if.cs = SEL_UCSEG;
 	_if.eflags = FLAG_IF | FLAG_MBS;
+	
 
 	/* We first kill the current context */
 	process_cleanup ();
+	
+	argv[argc] = strtok_r(input_str, " ", &saveptr);
+	argc++;
+	while(true){
+		argv[argc] = strtok_r(NULL, " ", &saveptr);
+		if (argv[argc] == NULL || argc >= MAX_ARGUMENTS){
+			break;
+		}
+		argc++;
+	}
 
+	file_name = argv[0];
 	/* And then load the binary */
 	success = load (file_name, &_if);
+	
+	push_argument(argv ,argc, &_if);
 
 	/* If load failed, quit. */
 	palloc_free_page (file_name);
 	if (!success)
+	//thread_exit()
 		return -1;
+	hex_dump(_if.rsp, _if.rsp, KERN_BASE - _if.rsp, true);
+	//missing_part;
 
 	/* Start switched process. */
 	do_iret (&_if);
 	NOT_REACHED ();
 }
+
+void
+push_argument(char** argv, int argc, struct intr_frame *_if){
+	uint8_t padding;
+
+	/*argument*/
+	for (int i = argc - 1 ; i > -1; i--){
+		_if->rsp = _if->rsp - strlen(argv[i]) - 1;
+		strlcpy(_if->rsp, argv[i], strlen(argv[i]) + 1);
+		argv[i] = (char*)_if->rsp;
+	}
+
+	/*padding*/
+	if(_if->rsp % 8 != 0){
+		padding = _if->rsp % 8;
+		_if->rsp = _if->rsp  - padding;
+		memset(_if->rsp, 0, padding);
+	}
+	
+	
+	/*argument addresss*/
+	for (int i = argc; i >= 0; i--){
+		_if->rsp = _if->rsp - sizeof(char*);
+		if (i == argc){
+			memset (_if->rsp, 0, sizeof(char*));
+		}
+		memcpy(_if->rsp, &argv[i], sizeof(char*));
+	}
+
+	/*return address*/
+	_if->rsp = _if->rsp - sizeof(void*);
+	memset (_if->rsp, 0, sizeof(void*));
+
+	_if->R.rdi = argc;
+	_if->R.rsi = _if->rsp + sizeof(void*);
+
+	// hex_dump(_if->rsp, _if->rsp, KERN_BASE - _if->rsp, true);
+}
+
 
 
 /* Waits for thread TID to die and returns its exit status.  If
@@ -201,9 +263,12 @@ process_exec (void *f_name) {
  * does nothing. */
 int
 process_wait (tid_t child_tid UNUSED) {
+	while(1){
+	}
 	/* XXX: Hint) The pintos exit if process_wait (initd), we recommend you
 	 * XXX:       to add infinite loop here before
 	 * XXX:       implementing the process_wait. */
+	//schedule
 	return -1;
 }
 
@@ -416,6 +481,7 @@ load (const char *file_name, struct intr_frame *if_) {
 
 	/* TODO: Your code goes here.
 	 * TODO: Implement argument passing (see project2/argument_passing.html). */
+	
 
 	success = true;
 

@@ -40,6 +40,7 @@ void give_back_prioirty(struct lock *lock, struct thread *current_thread);
 bool has_not_lock(struct thread *current_thread);
 void set_thread_priority_to_origin(struct thread *current_thread, struct thread *priority_check);
 void remove_priority_list(struct thread *current_thread, struct thread *priority_check);
+bool high_cond(const struct list_elem *first, const struct list_elem *second, void *aux UNUSED);
 
 /* Initializes semaphore SEMA to VALUE.  A semaphore is a
    nonnegative integer along with two atomic operators for
@@ -215,22 +216,37 @@ lock_acquire (struct lock *lock) {
 	list_push_front(&(thread_current()->possesion_lock_list), &lock->lock_elem);
 }
 
+// void 
+// donate(struct thread* current_thread, struct lock *lock){
+//     struct thread *holder = lock->holder;
+//     while (holder != NULL && current_thread->priority > holder->priority) {
+// 		list_push_front(&(lock->holder->priority_list),&current_thread->priority_elem);
+// 		list_sort(&(lock->holder->priority_list), high_function, NULL);
+//         holder->priority = current_thread->priority;
+//         if (holder->wait_lock != NULL) {
+// 			list_pop_front(&(lock->holder->priority_list));
+//             lock = holder->wait_lock;
+//             holder = lock->holder;
+//         } else {
+//             holder = NULL;
+//         }
+//     }
+// }
+/*Recursion*/
 void 
 donate(struct thread* current_thread, struct lock *lock){
     struct thread *holder = lock->holder;
-    while (holder != NULL && current_thread->priority > holder->priority) {
-		list_push_front(&(lock->holder->priority_list),&current_thread->priority_elem);
-		list_sort(&(lock->holder->priority_list), high_function, NULL);
+    if (holder != NULL && current_thread->priority > holder->priority) {
+        list_push_front(&(holder->priority_list),&current_thread->priority_elem);
+        list_sort(&(holder->priority_list), high_function, NULL);
         holder->priority = current_thread->priority;
         if (holder->wait_lock != NULL) {
-			list_pop_front(&(lock->holder->priority_list));
-            lock = holder->wait_lock;
-            holder = lock->holder;
-        } else {
-            holder = NULL;
+            list_pop_front(&(holder->priority_list));
+            donate(current_thread, holder->wait_lock);
         }
     }
 }
+
 
 
 
@@ -393,6 +409,16 @@ cond_wait (struct condition *cond, struct lock *lock) {
 	lock_acquire (lock);
 }
 
+bool
+high_cond(const struct list_elem *first, const struct list_elem *second, void *aux UNUSED){
+	const struct semaphore_elem *first_semaphore_elem = list_entry(first, struct semaphore_elem, elem);
+	const struct semaphore_elem *second_semaphore_elem = list_entry(second, struct semaphore_elem, elem);
+	const struct semaphore first_semaphore = first_semaphore_elem->semaphore;
+	const struct semaphore second_semaphore = second_semaphore_elem->semaphore;
+	const struct thread *first_thread = list_entry (list_front (&first_semaphore.waiters),struct thread, elem);
+	const struct thread *second_thread = list_entry (list_front (&second_semaphore.waiters),struct thread, elem);
+	return first_thread->priority > second_thread->priority;
+}
 /* If any threads are waiting on COND (protected by LOCK), then
    this function signals one of them to wake up from its wait.
    LOCK must be held before calling this function.
@@ -407,9 +433,10 @@ cond_signal (struct condition *cond, struct lock *lock UNUSED) {
 	ASSERT (!intr_context ());
 	ASSERT (lock_held_by_current_thread (lock));
 
-	if (!list_empty (&cond->waiters))
-		sema_up (&list_entry (list_pop_front (&cond->waiters),
-					struct semaphore_elem, elem)->semaphore);
+	if (!list_empty (&cond->waiters)){
+		list_sort(&cond->waiters,high_cond,NULL);
+		sema_up (&list_entry (list_pop_front (&cond->waiters), struct semaphore_elem, elem)->semaphore);
+	}
 }
 
 /* Wakes up all threads, if any, waiting on COND (protected by
