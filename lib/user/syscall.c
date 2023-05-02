@@ -71,12 +71,15 @@ static __inline int64_t syscall (uint64_t num_, uint64_t a1_, uint64_t a2_,
 void
 halt (void) {
 	syscall0 (SYS_HALT);
+	/*use power_off();*/
+	// power_off();
 	NOT_REACHED ();
 }
 
 void
 exit (int status) {
 	syscall1 (SYS_EXIT, status);
+	/*use thread_exit() print message "name of process: exit(status)"*/
 	NOT_REACHED ();
 }
 
@@ -87,11 +90,18 @@ fork (const char *thread_name){
 
 int
 exec (const char *file) {
+	/* create child process and execute program corresponds to cmd_line on it.
+	NOTICE! not similar in exec in UNIX exec in Pintos similar with combination of frok() and exec()*/
 	return (pid_t) syscall1 (SYS_EXEC, file);
 }
 
 int
-wait (pid_t pid) {
+wait (pid_t pid) {  
+	 /*wait for aachild process pid to exit and retirve the child's exit status.
+	 1. wait till pid is alive. 
+	 2. pid did not call exit, but was terminated by the kernel, return -1
+	 3. parent should deallocate its process descriptor
+	 */
 	return syscall1 (SYS_WAIT, pid);
 }
 
