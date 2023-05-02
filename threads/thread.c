@@ -474,7 +474,7 @@ init_thread (struct thread *t, const char *name, int priority) {
 	memset (t, 0, sizeof *t);
 	t->status = THREAD_BLOCKED;
 	strlcpy (t->name, name, sizeof t->name);
-	t->tf.rsp = (uint64_t) t + PGSIZE - sizeof (void *);
+	t->tf.rsp = (uint64_t) t + PGSIZE - sizeof (void *); //1<<12 == 4KB(kernel space size)
 	t->priority = priority;
 	t->magic = THREAD_MAGIC;
 	t->wait_lock = NULL;
@@ -565,12 +565,12 @@ thread_launch (struct thread *th) {
 	 * until switching is done. */
 	__asm __volatile (
 			/* Store registers that will be used. */
-			"push %%rax\n"
-			"push %%rbx\n"
+			"push %%rax\n" 
+			"push %%rbx\n" 
 			"push %%rcx\n"
 			/* Fetch input once */
-			"movq %0, %%rax\n"
-			"movq %1, %%rcx\n"
+			"movq %0, %%rax\n" //%0은 첫번쨰 인자 tf_cur
+			"movq %1, %%rcx\n" //%1은 두번째 인자 tf
 			"movq %%r15, 0(%%rax)\n"
 			"movq %%r14, 8(%%rax)\n"
 			"movq %%r13, 16(%%rax)\n"
