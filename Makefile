@@ -10,6 +10,7 @@ CLEAN_SUBDIRS = $(BUILD_SUBDIRS)
 clean::
 	for d in $(CLEAN_SUBDIRS); do $(MAKE) -C $$d $@; done
 	rm -f TAGS tags
+	
 	rm -f *.tar.gz
 
 distclean:: clean

@@ -26,8 +26,12 @@ static void process_cleanup (evoid);
 static bool load (const char *file_name, struct intr_frame *if_);
 static void initd (void *f_name);
 static void __do_fork (void *);
+<<<<<<< HEAD
+void  push_argument(char **argv, int argc, struct intr_frame *_if);
+=======
 void push_argument(char **argv, int argc, struct intr_frame *_if);
 
+>>>>>>> ad6146f91f9f9278dcd151a83ef4053bb84d5a9d
 /* General process initializer for initd and other process. */
 static void
 process_init (void) {
@@ -199,15 +203,18 @@ process_exec (void *f_name) {
 	
 	push_argument(argv ,argc, &_if);
 
+	push_argument(argv, argc, &_if);
+	/*USER_STACK - (uint64_t)_if.rsp는 유저 스택의 크기에서 현재 스택 포인터 _if.rsp가 위치한 주소를 빼서, 현재 유저 스택에 저장된 내용을 덤프하는 것*/
+	hex_dump(_if.rsp, _if.rsp, USER_STACK - (uint64_t)_if.rsp, true);
 	/* If load failed, quit. */
-	palloc_free_page (file_name);
-	if (!success)
+	palloc_free_page (file_name);	// file_name 문자열이 저장된 페이지를 해제
+	if (!success)					// 프로그램 로드에 실패한 경우 -1을 반환하고 함수를 종료
 		return -1;
 	// hex_dump(_if.rsp, _if.rsp, USER_STACK - (uint64_t)_if.rsp, true);
 	//missing_part;
 	uint64_t syscall_number = _if.R.rax;
 	/* Start switched process. */
-	do_iret (&_if);
+	do_iret (&_if);					// do_iret 함수를 호출하여 intr_frame 구조체 _if에 저장된 정보를 바탕으로 새로운 프로세스를 실행
 	NOT_REACHED ();
 }
 
