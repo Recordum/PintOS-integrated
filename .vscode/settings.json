@@ -1,5 +1,6 @@
 {
     "files.associations": {
-        "mmu.h": "c"
+        "mmu.h": "c",
+        "*.inc": "c"
     }
 }
