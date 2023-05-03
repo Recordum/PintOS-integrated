@@ -23,6 +23,7 @@ struct lock {
 	struct list_elem lock_elem;
 };
 
+extern struct lock filesys_lock;
 void lock_init (struct lock *);
 void lock_acquire (struct lock *);
 bool lock_try_acquire (struct lock *);
