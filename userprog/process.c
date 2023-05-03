@@ -274,7 +274,8 @@ push_argument(char** argv, int argc, struct intr_frame *_if){
 	memset (_if->rsp, 0, sizeof(void*));
 
 	_if->R.rdi = argc;
-	_if->R.rsi = _if->rsp + sizeof(void*);
+	_if->R.rsi = &argv[0];
+	// _if->R.rsi = _if->rsp + sizeof(void*);
 
 }
 
