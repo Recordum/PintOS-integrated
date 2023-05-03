@@ -7,6 +7,9 @@
 #include "userprog/gdt.h"
 #include "threads/flags.h"
 #include "intrinsic.h"
+#include "filesys/filesys.h"
+#include "filesys/file.h"
+
 
 void syscall_entry (void);
 void syscall_handler (struct intr_frame *);
@@ -90,6 +93,7 @@ syscall_handler (struct intr_frame *f) {
 		exit(ARG0);
 		break;
 	case SYS_FORK:
+		f->R.rax = fork(ARG0,f);
 		break;
 	case SYS_EXEC:
 		break;
@@ -99,13 +103,13 @@ syscall_handler (struct intr_frame *f) {
 		f->R.rax = create(ARG0,ARG1);
 		break;
 	case SYS_REMOVE:
-		remove(ARG0);
+		f->R.rax = remove(ARG0);
 		break;
 	case SYS_OPEN:
 		f->R.rax = open(ARG0);
 		break;
 	case SYS_FILESIZE:
-		filesize(ARG0);
+		f->R.rax = filesize(ARG0);
 		break;
 	case SYS_READ:
 		f->R.rax = read(ARG0, ARG1, ARG2);
@@ -114,8 +118,10 @@ syscall_handler (struct intr_frame *f) {
 		f->R.rax = write(ARG0, ARG1, ARG2);
 		break;
 	case SYS_SEEK:
+		seek(ARG0, ARG1);
 		break;
 	case SYS_TELL:
+		f->R.rax = (ARG0);
 		break;
 	case SYS_CLOSE:
 		close(ARG0);
@@ -150,9 +156,10 @@ exit(int status){
 	thread_exit();
 }
 
-// pid_t
-// fork (const char *thread_name){
-// }
+tid_t
+fork (const char *name, struct intr_frame *if_ UNUSED){
+	return process_fork(thread_name, if_);
+}
 // ​
 // /*현재 프로세스를 cmd_line에서 지정된 인수를 전달하여 이름이 지정된 실행 파일로 변경*/
 // int
@@ -187,7 +194,6 @@ open (const char *file) {
 	}
 	struct file *open_file = filesys_open(file);
 	struct thread *current_thread = thread_current();
-	struct file** fdt = current_thread->file_fdt;
 
 	if (open_file == NULL){
 		return -1;
@@ -195,8 +201,8 @@ open (const char *file) {
 
 	for (int fd = 2; fd < 64; fd++)
 	{
-		if (fdt[fd] == NULL){
-			fdt[fd] = open_file;
+		if (current_thread->file_fdt[fd] == NULL){
+			current_thread->file_fdt[fd] = open_file;
 			return fd;
 		}
 	}
@@ -211,13 +217,17 @@ close (int fd){
 
 int
 read(int fd, void *buffer, unsigned size){
+	lock_acquire(&filesys_lock);
 	if(fd == 0){
 		input_getc();
+		lock_release(&filesys_lock);	
 		return size;
 	}
 	struct thread* current_thread = thread_current();
 	struct file *file_object = current_thread->file_fdt[fd];
-	return file_read(file_object, buffer, size);
+	size = file_read(file_object, buffer, size);
+	lock_release(&filesys_lock);	
+	return size;	
 }
 
 int
@@ -245,7 +255,23 @@ write (int fd, const void *buffer, unsigned size){
 
 int
 filesize(int fd){
+
 	struct thread* current_thread = thread_current();
 	struct file *file_object = current_thread->file_fdt[fd];
-	return (int)file_length(file_object);
+	return file_length(file_object);
 }
+
+void
+seek(int fd, unsigned position){
+	struct thread* current_thread = thread_current();
+	struct file *file_object = current_thread->file_fdt[fd];
+	file_seek(file_object, position);
+}
+
+unsigned
+tell(int fd){
+	struct thread* current_thread = thread_current();
+	struct file *file_object = current_thread->file_fdt[fd];
+	return file_tell(file_object);
+}
+
