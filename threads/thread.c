@@ -292,7 +292,7 @@ thread_exit (void) {
 #ifdef USERPROG
 	process_exit ();
 #endif
-
+	
 	/* Just set our status to dying and schedule another process.
 	   We will be destroyed during the call to schedule_tail(). */
 	intr_disable ();
@@ -482,6 +482,7 @@ init_thread (struct thread *t, const char *name, int priority) {
 	t->origin_priority = priority;
 	list_init(&t->priority_list);
 	list_init(&t->possesion_lock_list);
+	// memset(t->fork_sema, 0, sizeof(struct semaphore*));
 	t->next_fd = 2;
 }
 

@@ -18,6 +18,7 @@
 #include "threads/mmu.h"
 #include "threads/vaddr.h"
 #include "intrinsic.h"
+#include "threads/synch.h"
 #ifdef VM
 #include "vm/vm.h"
 #endif
@@ -78,14 +79,16 @@ initd (void *f_name) {
  * 현재 프로세스를 이름으로 복제합니다. 새 프로세스의 스레드 ID를 반환하거나 스레드를 만들 수 없는 경우 TID_ERROR를 반환합니다.
  */
 tid_t
-process_fork (const char *name, struct intr_frame *if_ UNUSED) {
+process_fork (const char *name, struct intr_frame *if_) {
 	/* Clone current thread to new thread.*/
 	struct thread *current_thread = thread_current();
-
+	
+	sema_init(&(current_thread->fork_sema), 0);
 	/* 전달받은 intr_frame을 현재 parent_if에 복사 */
-	memcpy(&current_thread->parent_if, if_, sizeof(struct intr_frame));
-	tid_t pid = thread_create(name, PRI_DEFAULT, __do_fork, current_thread); 
+	current_thread->parent_if = *if_;
+	tid_t pid = thread_create(name, PRI_DEFAULT, __do_fork, current_thread);
 
+	sema_down(&(current_thread->fork_sema));
 	if (pid == TID_ERROR) {
 		return TID_ERROR;
 	}
@@ -175,15 +178,14 @@ __do_fork (void *aux) {
 	if (!pml4_for_each (parent->pml4, duplicate_pte, parent))
 		goto error;
 #endif
-
+	current->pml4 = file_duplicate(parent->pml4);
 	/* TODO: Your code goes here.
 	 * TODO: Hint) To duplicate the file object, use `file_duplicate`
 	 * TODO:       in include/filesys/file.h. Note that parent should not return
 	 * TODO:       from the fork() until this function successfully duplicates
 	 * TODO:       the resources of parent.*/
-
 	process_init ();
-
+	sema_up(&(parent->fork_sema));
 	/* Finally, switch to the newly created process. */
 	if (succ)
 		do_iret (&if_);
@@ -274,8 +276,7 @@ push_argument(char** argv, int argc, struct intr_frame *_if){
 	memset (_if->rsp, 0, sizeof(void*));
 
 	_if->R.rdi = argc;
-	_if->R.rsi = &argv[0];
-	// _if->R.rsi = _if->rsp + sizeof(void*);
+	_if->R.rsi = _if->rsp + sizeof(void*);
 
 }
 

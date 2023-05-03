@@ -5,6 +5,7 @@
 #include <list.h>
 #include <stdint.h>
 #include "threads/interrupt.h"
+#include "threads/synch.h"
 #ifdef VM
 #include "vm/vm.h"
 #endif
@@ -102,6 +103,8 @@ struct thread {
 	struct list_elem priority_elem;
 	struct list priority_list;
 	struct file* file_fdt[64];
+	struct semaphore fork_sema;
+	struct semaphore wait_sema;
 	int next_fd;
 	int exit_status;
 #ifdef USERPROG
