@@ -39,15 +39,6 @@ int write (int fd, const void *buffer, unsigned size);
 #define MSR_LSTAR 0xc0000082        /* Long mode SYSCALL target */
 #define MSR_SYSCALL_MASK 0xc0000084 /* Mask for the eflags */
 
-struct semaphore {
-	unsigned value;             /* Current value. */
-	struct list waiters;        /* List of waiting threads. */
-};
-struct lock {
-	struct thread *holder;      /* Thread holding lock (for debugging). */
-	struct semaphore semaphore; /* Binary semaphore controlling access. */
-	struct list_elem lock_elem;
-};
 struct lock filesys_lock;
 
 
@@ -93,11 +84,12 @@ syscall_handler (struct intr_frame *f) {
 		exit(ARG0);
 		break;
 	case SYS_FORK:
-		f->R.rax = fork(ARG0,f);
+		f->R.rax = fork(ARG0, ARG1);
 		break;
 	case SYS_EXEC:
 		break;
 	case SYS_WAIT:
+		f->R.rax = wait(ARG0);
 		break;
 	case SYS_CREATE:
 		f->R.rax = create(ARG0,ARG1);
@@ -150,15 +142,19 @@ halt(){
 
 void
 exit(int status){
+	struct thread* current_thread = thread_current();
 	char* name = thread_current()->name;
 	printf("%s: exit(%d)\n",name, status);
 	thread_current()->exit_status = status;
+	if (!list_empty(&(current_thread->wait_sema.waiters))){
+		sema_up(&(current_thread->wait_sema));
+	}
 	thread_exit();
 }
 
 tid_t
-fork (const char *name, struct intr_frame *if_ UNUSED){
-	return process_fork(thread_name, if_);
+fork (const char *name, struct intr_frame *if_){
+	return process_fork(name, if_);
 }
 // ​
 // /*현재 프로세스를 cmd_line에서 지정된 인수를 전달하여 이름이 지정된 실행 파일로 변경*/
@@ -167,6 +163,13 @@ fork (const char *name, struct intr_frame *if_ UNUSED){
 // 	check_address(file);
 // }
 
+int
+wait(tid_t pid){
+	struct thread* current_thread = thread_current();
+	sema_init(&(current_thread->wait_sema), 0);
+	sema_down(&(current_thread->wait_sema));
+	return 0;
+}
 
 bool
 create (const char *file, unsigned initial_size) {
