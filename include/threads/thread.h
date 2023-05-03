@@ -103,6 +103,7 @@ struct thread {
 	struct list priority_list;
 	struct file* file_fdt[64];
 	int next_fd;
+	int exit_status;
 #ifdef USERPROG
 	/* Owned by userprog/process.c. */
 	uint64_t *pml4;                     /* Page map level 4 */
