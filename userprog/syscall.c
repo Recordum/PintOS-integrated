@@ -45,8 +45,8 @@ struct lock {
 	struct semaphore semaphore; /* Binary semaphore controlling access. */
 	struct list_elem lock_elem;
 };
-
 struct lock filesys_lock;
+
 
 syscall_init (void) {
 	lock_init(&filesys_lock);
@@ -96,22 +96,22 @@ syscall_handler (struct intr_frame *f) {
 	case SYS_WAIT:
 		break;
 	case SYS_CREATE:
-		create(ARG0,ARG1);
+		f->R.rax = create(ARG0,ARG1);
 		break;
 	case SYS_REMOVE:
 		remove(ARG0);
 		break;
 	case SYS_OPEN:
-		open(ARG0);
+		f->R.rax = open(ARG0);
 		break;
 	case SYS_FILESIZE:
 		filesize(ARG0);
 		break;
 	case SYS_READ:
-		read(ARG0, ARG1, ARG2);
+		f->R.rax = read(ARG0, ARG1, ARG2);
 		break;
 	case SYS_WRITE:
-		write(ARG0, ARG1, ARG2);
+		f->R.rax = write(ARG0, ARG1, ARG2);
 		break;
 	case SYS_SEEK:
 		break;
@@ -120,17 +120,19 @@ syscall_handler (struct intr_frame *f) {
 	case SYS_CLOSE:
 		close(ARG0);
 		break;
+	default:
+		thread_exit ();
 	}
 
 	// printf ("system call!\n");
-	// thread_exit ();
+	// 
 }
 
 
 void
 check_address(void *addr) {
 	struct thread *t = thread_current();
-	if (!is_user_vaddr(addr)||addr == NULL||pml4_get_page(t->pml4, addr)== NULL) {								
+	if (addr == NULL||!is_user_vaddr(addr)||pml4_get_page(t->pml4, addr)== NULL) {								
 		exit(-1);
 	}
 }
@@ -144,6 +146,7 @@ void
 exit(int status){
 	char* name = thread_current()->name;
 	printf("%s: exit(%d)\n",name, status);
+	thread_current()->exit_status = status;
 	thread_exit();
 }
 
@@ -159,8 +162,16 @@ exit(int status){
 
 
 bool
-create (const char *file, unsigned initial_size) {	
-	return filesys_create(file, initial_size);
+create (const char *file, unsigned initial_size) {
+	lock_acquire(&filesys_lock);
+	if (!strcmp(file,"")){
+		exit(-1);
+	}
+	check_address(file);
+	bool create_result = filesys_create(file, initial_size);
+
+	lock_release(&filesys_lock);
+	return create_result;
 }
 
 bool
@@ -171,22 +182,25 @@ remove (const char *file) {
 int 
 open (const char *file) {
 	
+	if (strcmp(file, "") == 0){
+		return -1;
+	}
 	struct file *open_file = filesys_open(file);
 	struct thread *current_thread = thread_current();
 	struct file** fdt = current_thread->file_fdt;
-	
+
 	if (open_file == NULL){
 		return -1;
 	}
 
-	for (int fd = 0; fd < sizeof(fdt); fd++)
+	for (int fd = 2; fd < 64; fd++)
 	{
 		if (fdt[fd] == NULL){
 			fdt[fd] = open_file;
-			// current_thread->next_fd = fd;
 			return fd;
 		}
-	}		
+	}
+	return -1;		
 }
 
 void 
@@ -208,13 +222,25 @@ read(int fd, void *buffer, unsigned size){
 
 int
 write (int fd, const void *buffer, unsigned size){
-	if(fd == 1){
-		putbuf(buffer, size);
-		return size;
-	}
+	lock_acquire(&filesys_lock);
 	struct thread* current_thread = thread_current();
 	struct file *file_object = current_thread->file_fdt[fd];
-	return file_write(file_object, buffer, size);
+	
+	if(fd == 1){
+		putbuf(buffer, size);
+		lock_release(&filesys_lock);
+		return size;
+	}
+	
+	if(file_object == NULL){
+		lock_release(&filesys_lock);
+		return -1;
+	}
+
+	size = file_write(file_object, buffer, size);
+	lock_release(&filesys_lock);
+
+	return size;
 }
 
 int
