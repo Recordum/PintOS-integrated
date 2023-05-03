@@ -108,6 +108,8 @@ struct thread {
 	/* Owned by userprog/process.c. */
 	uint64_t *pml4;                     /* Page map level 4 */
 #endif
+	
+
 #ifdef VM
 	/* Table for whole virtual memory owned by thread. */
 	struct supplemental_page_table spt;
@@ -116,6 +118,14 @@ struct thread {
 	/* Owned by thread.c. */
 	struct intr_frame tf;               /* Information for switching */
 	unsigned magic;                     /* Detects stack overflow. */
+
+	// USERPROG
+	struct list child_list;				/*자식 프로세스 리스트*/
+    struct list_elem child_elem;		
+	struct intr_frame parent_if;        /* 자식에게 넘겨줄 intr_frame 프로세스의 정보를 가진 자료구조 */
+
+
+
 };
 
 /* If false (default), use round-robin scheduler.

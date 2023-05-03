@@ -90,6 +90,7 @@ syscall_handler (struct intr_frame *f) {
 		exit(ARG0);
 		break;
 	case SYS_FORK:
+		f->R.rax = fork(ARG0,f);
 		break;
 	case SYS_EXEC:
 		break;
@@ -150,9 +151,10 @@ exit(int status){
 	thread_exit();
 }
 
-// pid_t
-// fork (const char *thread_name){
-// }
+tid_t
+fork (const char *name, struct intr_frame *if_ UNUSED){
+	return process_fork(thread_name, if_);
+}
 // ​
 // /*현재 프로세스를 cmd_line에서 지정된 인수를 전달하여 이름이 지정된 실행 파일로 변경*/
 // int
