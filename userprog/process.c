@@ -207,13 +207,16 @@ error:
 int
 process_exec (void *f_name) {
 	const int MAX_ARGUMENTS = 128;
-	char *input_str = f_name;
+	
+	struct thread* current_thread = thread_current();
+	strlcpy(current_thread->exec_file, f_name, strlen(f_name)+1);
 	char *file_name;
 	bool success;
 	char *token;
 	int argc = 0;
 	char *saveptr;
 	char *argv[MAX_ARGUMENTS];
+	
 	/* We cannot use the intr_frame in the thread structure.
 	 * This is because when current thread rescheduled,
 	 * it stores the execution information to the member. */
@@ -224,7 +227,10 @@ process_exec (void *f_name) {
 	
 	/* We first kill the current context */
 	process_cleanup ();
-	
+	char *input_str = palloc_get_page(0);
+	current_thread = thread_current();
+	strlcpy(input_str, current_thread->exec_file, strlen(current_thread->exec_file)+1);
+
 	argv[argc] = strtok_r(input_str, " ", &saveptr);
 	argc++;
 	while(true){
@@ -237,6 +243,7 @@ process_exec (void *f_name) {
 
 	file_name = argv[0];
 	/* And then load the binary */
+	
 	success = load (file_name, &_if);
 	
 	push_argument(argv ,argc, &_if);
@@ -314,12 +321,11 @@ process_wait (tid_t child_tid UNUSED) {
 /* Exit the process. This function is called by thread_exit (). */
 void
 process_exit (void) {
-	struct thread *curr = thread_current ();
-	/* TODO: Your code goes here.
-	 * TODO: Implement process termination message (see
-	 * TODO: project2/process_termination.html).
-	 * TODO: We recommend you to implement process resource cleanup here. */
-
+	struct thread* current_thread = thread_current();
+	char* name = thread_current()->name;
+	int status = current_thread->parent->exit_status;
+	printf("%s: exit(%d)\n",name, status);
+	sema_up(&(current_thread->parent->wait_sema));
 	process_cleanup ();
 }
 

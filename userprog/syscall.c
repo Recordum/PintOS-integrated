@@ -9,16 +9,16 @@
 #include "intrinsic.h"
 #include "filesys/filesys.h"
 #include "filesys/file.h"
-
+#include "threads/palloc.h"
 
 void syscall_entry (void);
 void syscall_handler (struct intr_frame *);
 void check_address(void *addr);
 void halt();
 void exit(int status);
-// pid_t fork (const char *thread_name);
-// int exec (const char *file); 
-// int wait (pid_t pid);
+tid_t fork (const char *name, struct intr_frame *if_);
+int exec (const char *file); 
+int wait (tid_t pid);
 bool create (const char *file, unsigned initial_size);
 bool remove (const char *file);
 int open (const char *file);
@@ -87,6 +87,7 @@ syscall_handler (struct intr_frame *f) {
 		f->R.rax = fork(ARG0, f);
 		break;
 	case SYS_EXEC:
+		f->R.rax = exec(ARG0);
 		break;
 	case SYS_WAIT:
 		f->R.rax = wait(ARG0);
@@ -143,10 +144,8 @@ halt(){
 void
 exit(int status){
 	struct thread* current_thread = thread_current();
-	char* name = thread_current()->name;
-	printf("%s: exit(%d)\n",name, status);
+
 	current_thread->parent->exit_status = status;
-	sema_up(&(current_thread->parent->wait_sema));
 	thread_exit();
 }
 
@@ -154,12 +153,13 @@ tid_t
 fork (const char *name, struct intr_frame *if_){
 	return process_fork(name, if_);
 }
-// ​
-// /*현재 프로세스를 cmd_line에서 지정된 인수를 전달하여 이름이 지정된 실행 파일로 변경*/
-// int
-// exec (const char *file) {
-// 	check_address(file);
-// }
+
+int
+exec (const char *file) {
+	
+	
+	return process_exec(file);
+}
 
 int
 wait(tid_t pid){
