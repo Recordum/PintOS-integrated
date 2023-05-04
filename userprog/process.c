@@ -85,7 +85,7 @@ process_fork (const char *name, struct intr_frame *if_) {
 	
 	sema_init(&(current_thread->fork_sema), 0);
 	/* 전달받은 intr_frame을 현재 parent_if에 복사 */
-	current_thread->parent_if = *if_;
+	memcpy(&(current_thread->parent_if), if_, sizeof(struct intr_frame));
 	tid_t pid = thread_create(name, PRI_DEFAULT, __do_fork, current_thread);
 
 	sema_down(&(current_thread->fork_sema));
@@ -158,12 +158,13 @@ __do_fork (void *aux) {
 	struct thread *parent = (struct thread *) aux;
 	struct thread *current = thread_current ();
 	/* TODO: somehow pass the parent_if. (i.e. process_fork()'s if_) */
-	struct intr_frame *parent_if = &parent->parent_if;
+	struct intr_frame parent_if = parent->parent_if;
 	bool succ = true;
 
 	/* 1. Read the cpu context to local stack. */
-	memcpy (&if_, parent_if, sizeof (struct intr_frame));
-
+	memcpy (&current->tf, &parent_if, sizeof (struct intr_frame));
+	current->tf.R.rax = 0;
+	
 	/* 2. Duplicate PT */
 	current->pml4 = pml4_create();
 	if (current->pml4 == NULL)
@@ -178,17 +179,25 @@ __do_fork (void *aux) {
 	if (!pml4_for_each (parent->pml4, duplicate_pte, parent))
 		goto error;
 #endif
-	current->pml4 = file_duplicate(parent->pml4);
+
+	for (size_t i = 0; i < 64; i++)
+	{
+		if (parent->file_fdt[i] != NULL){
+			current->file_fdt[i] = file_duplicate(parent->file_fdt[i]);
+		}
+	}
+	
 	/* TODO: Your code goes here.
 	 * TODO: Hint) To duplicate the file object, use `file_duplicate`
 	 * TODO:       in include/filesys/file.h. Note that parent should not return
 	 * TODO:       from the fork() until this function successfully duplicates
 	 * TODO:       the resources of parent.*/
 	process_init ();
+	
 	sema_up(&(parent->fork_sema));
 	/* Finally, switch to the newly created process. */
 	if (succ)
-		do_iret (&if_);
+		do_iret (&current->tf);
 error:
 	thread_exit ();
 }
@@ -293,15 +302,13 @@ push_argument(char** argv, int argc, struct intr_frame *_if){
  * does nothing. */
 int
 process_wait (tid_t child_tid UNUSED) {
-	
-	for(int i = 0 ; i < 100000000; i++){
-
-	}
+	struct thread* current_thread = thread_current();
+	sema_down(&(current_thread->wait_sema));
 	/* XXX: Hint) The pintos exit if process_wait (initd), we recommend you
 	 * XXX:       to add infinite loop here before
 	 * XXX:       implementing the process_wait. */
 	//schedule
-	return -1;
+	return current_thread->exit_status;
 }
 
 /* Exit the process. This function is called by thread_exit (). */
@@ -438,7 +445,7 @@ load (const char *file_name, struct intr_frame *if_) {
 		printf ("load: %s: open failed\n", file_name);
 		goto done;
 	}
-
+	
 	/* Read and verify executable header. */
 	if (file_read (file, &ehdr, sizeof ehdr) != sizeof ehdr
 			|| memcmp (ehdr.e_ident, "\177ELF\2\1\1", 7)
@@ -514,7 +521,6 @@ load (const char *file_name, struct intr_frame *if_) {
 	/* TODO: Your code goes here.
 	 * TODO: Implement argument passing (see project2/argument_passing.html). */
 	
-
 	success = true;
 
 done:

@@ -84,7 +84,7 @@ syscall_handler (struct intr_frame *f) {
 		exit(ARG0);
 		break;
 	case SYS_FORK:
-		f->R.rax = fork(ARG0, ARG1);
+		f->R.rax = fork(ARG0, f);
 		break;
 	case SYS_EXEC:
 		break;
@@ -145,10 +145,8 @@ exit(int status){
 	struct thread* current_thread = thread_current();
 	char* name = thread_current()->name;
 	printf("%s: exit(%d)\n",name, status);
-	thread_current()->exit_status = status;
-	if (!list_empty(&(current_thread->wait_sema.waiters))){
-		sema_up(&(current_thread->wait_sema));
-	}
+	current_thread->parent->exit_status = status;
+	sema_up(&(current_thread->parent->wait_sema));
 	thread_exit();
 }
 
@@ -165,10 +163,7 @@ fork (const char *name, struct intr_frame *if_){
 
 int
 wait(tid_t pid){
-	struct thread* current_thread = thread_current();
-	sema_init(&(current_thread->wait_sema), 0);
-	sema_down(&(current_thread->wait_sema));
-	return 0;
+	return process_wait(pid);
 }
 
 bool

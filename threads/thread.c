@@ -183,8 +183,8 @@ tid_t
 thread_create (const char *name, int priority,
 		thread_func *function, void *aux) {
 	struct thread *t;
+	struct thread *parent_thread = thread_current();
 	tid_t tid;
-
 	ASSERT (function != NULL);
 
 	/* Allocate thread. */
@@ -206,7 +206,9 @@ thread_create (const char *name, int priority,
 	t->tf.ss = SEL_KDSEG;
 	t->tf.cs = SEL_KCSEG;
 	t->tf.eflags = FLAG_IF;
+	t->parent = parent_thread;
 	
+	list_push_back(&(parent_thread->child_list), &(t->child_elem));
 	/* Add to run queue. */
 	thread_unblock (t);
 	
@@ -482,6 +484,8 @@ init_thread (struct thread *t, const char *name, int priority) {
 	t->origin_priority = priority;
 	list_init(&t->priority_list);
 	list_init(&t->possesion_lock_list);
+	list_init(&t->child_list);
+	sema_init(&(t->wait_sema), 0);
 	// memset(t->fork_sema, 0, sizeof(struct semaphore*));
 	t->next_fd = 2;
 }
