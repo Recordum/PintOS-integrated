@@ -124,11 +124,9 @@ struct thread {
 
 	// USERPROG
 	struct list child_list;				/*자식 프로세스 리스트*/
-    struct list_elem child_elem;		
+    struct list_elem child_elem;	
 	struct intr_frame parent_if;        /* 자식에게 넘겨줄 intr_frame 프로세스의 정보를 가진 자료구조 */
-
-
-
+	struct thread *parent;
 };
 
 /* If false (default), use round-robin scheduler.

@@ -1,6 +1,7 @@
 {
     "files.associations": {
         "mmu.h": "c",
-        "*.inc": "c"
+        "filesys.h": "c",
+        "file.h": "c"
     }
 }
