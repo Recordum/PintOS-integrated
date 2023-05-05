@@ -246,14 +246,15 @@ process_exec (void *f_name) {
 	
 	success = load (file_name, &_if);
 
-	palloc_free_page (file_name);
+	
 
 	/* If load failed, quit. */
 	if (!success)					
     	return -1;
 
 	push_argument(argv ,argc, &_if);
-
+	
+	palloc_free_page (file_name);
 	/* Start switched process. */
 	do_iret (&_if);					
 	NOT_REACHED ();
@@ -537,12 +538,14 @@ load (const char *file_name, struct intr_frame *if_) {
 
 	/* TODO: Your code goes here.
 	 * TODO: Implement argument passing (see project2/argument_passing.html). */
-	
+	file_deny_write(file);
+	thread_current()->open_file = file;
+
 	success = true;
 
 done:
 	/* We arrive here whether the load is successful or not. */
-	file_close (file);
+	// file_close (file);
 	return success;
 }
 

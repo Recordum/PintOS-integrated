@@ -152,6 +152,9 @@ exit(int status){
 	struct thread* current_thread = thread_current();
 	char* name = thread_current()->name;
 	current_thread->parent->exit_status = status;
+	if (current_thread->open_file != NULL){
+		file_allow_write(current_thread->open_file);
+	}
 	printf("%s: exit(%d)\n",name, status);
 	thread_exit();
 }
@@ -163,6 +166,7 @@ fork (const char *name, struct intr_frame *if_){
 
 int
 exec (const char *file) {
+	
 	return process_exec(file);
 }
 
@@ -191,30 +195,37 @@ remove (const char *file) {
 
 int 
 open (const char *file) {
-	
+	lock_acquire(&filesys_lock);
 	if (strcmp(file, "") == 0){
+		lock_release(&filesys_lock);
 		return -1;
 	}
 	struct file *open_file = filesys_open(file);
 	struct thread *current_thread = thread_current();
 
 	if (open_file == NULL){
+		lock_release(&filesys_lock);
 		return -1;
 	}
-
 	for (int fd = 2; fd < 64; fd++)
 	{
 		if (current_thread->file_fdt[fd] == NULL){
 			current_thread->file_fdt[fd] = open_file;
+			lock_release(&filesys_lock);
 			return fd;
 		}
 	}
+	lock_release(&filesys_lock);
 	return -1;		
 }
 
 void 
 close (int fd){
 	struct thread* current_thread = thread_current();
+	if(current_thread->file_fdt[fd] == NULL){
+		return;
+	}
+	file_allow_write(current_thread->file_fdt[fd]);
 	current_thread->file_fdt[fd] = NULL;
 }
 
@@ -226,6 +237,7 @@ read(int fd, void *buffer, unsigned size){
 		lock_release(&filesys_lock);	
 		return size;
 	}
+
 	struct thread* current_thread = thread_current();
 	struct file *file_object = current_thread->file_fdt[fd];
 	size = file_read(file_object, buffer, size);

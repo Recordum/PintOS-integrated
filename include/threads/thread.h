@@ -127,6 +127,7 @@ struct thread {
 	struct intr_frame parent_if;        /* 자식에게 넘겨줄 intr_frame 프로세스의 정보를 가진 자료구조 */
 	struct thread *parent;
 	int wait_success_tid;
+	struct file* open_file;
 	char* exec_file;
 };
 
