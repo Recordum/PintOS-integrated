@@ -87,13 +87,12 @@ process_fork (const char *name, struct intr_frame *if_) {
 	/* 전달받은 intr_frame을 현재 parent_if에 복사 */
 	memcpy(&(current_thread->parent_if), if_, sizeof(struct intr_frame));
 	tid_t pid = thread_create(name, PRI_DEFAULT, __do_fork, current_thread);
-
+	
 	sema_down(&(current_thread->fork_sema));
 	if (pid == TID_ERROR) {
 		return TID_ERROR;
 	}
-	// return thread_create (name,
-	// 		PRI_DEFAULT, __do_fork, thread_current ());
+	
 	return pid;
 }
 
@@ -154,7 +153,6 @@ duplicate_pte (uint64_t *pte, void *va, void *aux) {
  */
 static void
 __do_fork (void *aux) {
-	struct intr_frame if_;
 	struct thread *parent = (struct thread *) aux;
 	struct thread *current = thread_current ();
 	/* TODO: somehow pass the parent_if. (i.e. process_fork()'s if_) */
@@ -207,7 +205,6 @@ error:
 int
 process_exec (void *f_name) {
 	const int MAX_ARGUMENTS = 128;
-	
 	struct thread* current_thread = thread_current();
 	strlcpy(current_thread->exec_file, f_name, strlen(f_name)+1);
 	char *file_name;
@@ -227,20 +224,23 @@ process_exec (void *f_name) {
 	
 	/* We first kill the current context */
 	process_cleanup ();
-	char *input_str = palloc_get_page(0);
+	char *input_str = palloc_get_page(PAL_USER);
+	
 	current_thread = thread_current();
-	strlcpy(input_str, current_thread->exec_file, strlen(current_thread->exec_file)+1);
 
+	strlcpy(input_str, current_thread->exec_file, strlen(current_thread->exec_file)+1);
+	
 	argv[argc] = strtok_r(input_str, " ", &saveptr);
 	argc++;
+
 	while(true){
 		argv[argc] = strtok_r(NULL, " ", &saveptr);
-		if (argv[argc] == NULL || argc >= MAX_ARGUMENTS){
+ 		if (argv[argc] == NULL || argc >= MAX_ARGUMENTS){
 			break;
 		}
 		argc++;
 	}
-
+	
 	file_name = argv[0];
 	/* And then load the binary */
 	
@@ -249,11 +249,13 @@ process_exec (void *f_name) {
 	push_argument(argv ,argc, &_if);
 	
 	/* If load failed, quit. */
-	palloc_free_page (file_name);	//
+	palloc_free_page (file_name);	
 	if (!success)					
-		return -1;
+    	return -1;
 	//missing_part;
-	uint64_t syscall_number = _if.R.rax;
+	
+	struct thread* parent = current_thread->parent;
+
 	/* Start switched process. */
 	do_iret (&_if);					
 	NOT_REACHED ();
@@ -310,11 +312,13 @@ push_argument(char** argv, int argc, struct intr_frame *_if){
 int
 process_wait (tid_t child_tid UNUSED) {
 	struct thread* current_thread = thread_current();
-	sema_down(&(current_thread->wait_sema));
-	/* XXX: Hint) The pintos exit if process_wait (initd), we recommend you
-	 * XXX:       to add infinite loop here before
-	 * XXX:       implementing the process_wait. */
-	//schedule
+	if (current_thread->wait_success_tid == child_tid){
+		return -1;
+	}
+	if (!list_empty(&(current_thread->child_list))){
+		sema_down(&(current_thread->wait_sema));
+	}
+	current_thread->wait_success_tid = child_tid;
 	return current_thread->exit_status;
 }
 
@@ -322,10 +326,19 @@ process_wait (tid_t child_tid UNUSED) {
 void
 process_exit (void) {
 	struct thread* current_thread = thread_current();
-	char* name = thread_current()->name;
-	int status = current_thread->parent->exit_status;
-	printf("%s: exit(%d)\n",name, status);
 	sema_up(&(current_thread->parent->wait_sema));
+	struct list_elem *child_element = list_begin(&(current_thread->parent->child_list));
+	while(true){
+		if (child_element == list_end(&(current_thread->parent->child_list))){
+			break;
+		}
+		struct thread *child_thread = list_entry(child_element, struct thread, child_elem);
+		if (child_thread == current_thread){
+			list_remove(child_element);
+			break;
+		}
+		child_element = list_next(child_element);
+	}
 	process_cleanup ();
 }
 

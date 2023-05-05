@@ -15,8 +15,8 @@
 /* Page allocator.  Hands out memory in page-size (or
    page-multiple) chunks.  See malloc.h for an allocator that
    hands out smaller chunks.
-
    System memory is divided into two "pools" called the kernel
+
    and user pools.  The user pool is for user (virtual) memory
    pages, the kernel pool for everything else.  The idea here is
    that the kernel needs to have memory for its own operations

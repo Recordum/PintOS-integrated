@@ -131,7 +131,13 @@ syscall_handler (struct intr_frame *f) {
 void
 check_address(void *addr) {
 	struct thread *t = thread_current();
-	if (addr == NULL||!is_user_vaddr(addr)||pml4_get_page(t->pml4, addr)== NULL) {								
+	if (addr == NULL) {								
+		exit(-1);
+	}
+	if(is_kernel_vaddr(addr)){
+		exit(-1);
+	}
+	if(pml4_get_page(t->pml4, addr) == NULL){
 		exit(-1);
 	}
 }
@@ -144,8 +150,9 @@ halt(){
 void
 exit(int status){
 	struct thread* current_thread = thread_current();
-
+	char* name = thread_current()->name;
 	current_thread->parent->exit_status = status;
+	printf("%s: exit(%d)\n",name, status);
 	thread_exit();
 }
 
@@ -156,8 +163,6 @@ fork (const char *name, struct intr_frame *if_){
 
 int
 exec (const char *file) {
-	
-	
 	return process_exec(file);
 }
 
@@ -172,7 +177,7 @@ create (const char *file, unsigned initial_size) {
 	if (!strcmp(file,"")){
 		exit(-1);
 	}
-	check_address(file);
+	// check_address(file);
 	bool create_result = filesys_create(file, initial_size);
 
 	lock_release(&filesys_lock);

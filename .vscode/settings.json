@@ -2,6 +2,8 @@
     "files.associations": {
         "mmu.h": "c",
         "filesys.h": "c",
-        "file.h": "c"
+        "file.h": "c",
+        "process.h": "c",
+        "synch.h": "c"
     }
 }

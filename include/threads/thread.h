@@ -102,7 +102,7 @@ struct thread {
 	struct lock *wait_lock;
 	struct list_elem priority_elem;
 	struct list priority_list;
-	struct file* file_fdt[64];
+	struct file** file_fdt;
 	struct semaphore fork_sema;
 	struct semaphore wait_sema;
 	int next_fd;
@@ -127,6 +127,8 @@ struct thread {
     struct list_elem child_elem;	
 	struct intr_frame parent_if;        /* 자식에게 넘겨줄 intr_frame 프로세스의 정보를 가진 자료구조 */
 	struct thread *parent;
+	int wait_success_tid;
+	char* exec_file;
 };
 
 /* If false (default), use round-robin scheduler.
