@@ -105,7 +105,6 @@ struct thread {
 	struct file** file_fdt;
 	struct semaphore fork_sema;
 	struct semaphore wait_sema;
-	int next_fd;
 	int exit_status;
 #ifdef USERPROG
 	/* Owned by userprog/process.c. */

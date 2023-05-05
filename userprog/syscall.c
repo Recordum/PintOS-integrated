@@ -177,7 +177,7 @@ create (const char *file, unsigned initial_size) {
 	if (!strcmp(file,"")){
 		exit(-1);
 	}
-	// check_address(file);
+	check_address(file);
 	bool create_result = filesys_create(file, initial_size);
 
 	lock_release(&filesys_lock);

@@ -245,16 +245,14 @@ process_exec (void *f_name) {
 	/* And then load the binary */
 	
 	success = load (file_name, &_if);
-	
-	push_argument(argv ,argc, &_if);
-	
+
+	palloc_free_page (file_name);
+
 	/* If load failed, quit. */
-	palloc_free_page (file_name);	
 	if (!success)					
     	return -1;
-	//missing_part;
-	
-	struct thread* parent = current_thread->parent;
+
+	push_argument(argv ,argc, &_if);
 
 	/* Start switched process. */
 	do_iret (&_if);					

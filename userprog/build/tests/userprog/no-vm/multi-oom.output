@@ -1,0 +1,44 @@
+Kernel command line: -q -f put multi-oom run multi-oom
+0 ~ 9fc00 1
+100000 ~ 13e0000 1
+Pintos booting with: 
+	base_mem: 0x0 ~ 0x9fc00 (Usable: 639 kB)
+	ext_mem: 0x100000 ~ 0x13e0000 (Usable: 19,328 kB)
+Calibrating timer...  117,760,000 loops/s.
+hd0:0: detected 321 sector (160 kB) disk, model "QEMU HARDDISK", serial "QM00001"
+hd0:1: detected 20,160 sector (9 MB) disk, model "QEMU HARDDISK", serial "QM00002"
+hd1:0: detected 108 sector (54 kB) disk, model "QEMU HARDDISK", serial "QM00003"
+Formatting file system...done.
+Boot complete.
+Putting 'multi-oom' into the file system...
+Executing 'multi-oom':
+(multi-oom) begin
+child_6_X: exit(-1)
+(multi-oom) Should return > 0.: FAILED
+child_5_O: exit(1)
+child_7_X: exit(-1)
+child_4_O: exit(1)
+child_3_O: exit(1)
+child_2_O: exit(1)
+(multi-oom) Should return > 0.: FAILED
+child_6_O: exit(1)
+Interrupt 0x0d (#GP General Protection Exception) at rip=8004218231
+ cr2=0000000000000000 error=               0
+rax cccccccccccccccc rbx 0000000000000000 rcx 0000000000000000 rdx 0000008004209e67
+rsp 0000008004283d68 rbp 0000008004283d70 rsi 00000080042780d8 rdi cccccccccccccccc
+rip 0000008004218231 r8 0000008004283db8  r9 000000800421b62b r10 0000000000000000
+r11 0000000000000202 r12 000000800421d18d r13 0000000000000000 r14 0000000000000000
+r15 0000000000000000 rflags 00000086
+es: 001b ds: 001b cs: 0008 ss: 0010
+Kernel PANIC at ../../userprog/exception.c:97 in kill(): Kernel bug - unexpected interrupt in kernel
+Call stack: 0x80042181b2 0x800421cf62 0x8004208df4 0x8004209212 0x80042183d4 0x8004218f03 0x80042192d3 0x800420a00f 0x800421c264 0x80042071db 0x800421d548 0x800421d270 0x800421d0b6 0x40075f 0x4003f7 0x40044b 0x400fb0.
+The `backtrace' program can make call stacks useful.
+Read "Backtraces" in the "Debugging Tools" chapter
+of the Pintos documentation for more information.
+Timer: 75 ticks
+Thread: 30 idle ticks, 30 kernel ticks, 15 user ticks
+hd0:0: 0 reads, 0 writes
+hd0:1: 228 reads, 244 writes
+hd1:0: 108 reads, 0 writes
+Console: 1979 characters output
+Key

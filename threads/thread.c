@@ -489,7 +489,6 @@ init_thread (struct thread *t, const char *name, int priority) {
 	
 	// t->file_fdt = palloc_get_page(PAL_USER);
 	t->exec_file = "";
-	t->next_fd = 2;
 	t->exit_status = -1;
 }
 
