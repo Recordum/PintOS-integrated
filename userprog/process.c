@@ -322,6 +322,7 @@ process_wait (tid_t child_tid UNUSED) {
 		sema_up(&(current_thread->exit_sema));
 	}
 	current_thread->wait_success_tid = child_tid;
+
 	return current_thread->exit_status;
 }
 
@@ -337,14 +338,16 @@ process_exit (void) {
 		}
 		struct thread *child_thread = list_entry(child_element, struct thread, child_elem);
 		if (child_thread == current_thread){
+			sema_down(&(current_thread->parent->exit_sema));
+			current_thread->parent->exit_status = current_thread->exit_status;
 			list_remove(child_element);
 			break;
 		}
 		child_element = list_next(child_element);
 	}
-	if (current_thread->fork_flag == 1){
-		sema_down(&(current_thread->parent->exit_sema));
-	}
+	// if (current_thread->fork_flag == 1){
+	// 	sema_down(&(current_thread->parent->exit_sema));
+	// }
 	process_cleanup ();
 }
 

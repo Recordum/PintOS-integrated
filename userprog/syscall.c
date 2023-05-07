@@ -151,7 +151,7 @@ void
 exit(int status){
 	struct thread* current_thread = thread_current();
 	char* name = thread_current()->name;
-	current_thread->parent->exit_status = status;
+	current_thread->exit_status = status;
 	if (current_thread->open_file != NULL){
 		file_close(current_thread->open_file);
 	}
