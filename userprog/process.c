@@ -250,7 +250,8 @@ process_exec (void *f_name) {
 	
 
 	/* If load failed, quit. */
-	if (!success)					
+	if (!success)
+		// palloc_free_page (file_name);					
     	return -1;
 
 	push_argument(argv ,argc, &_if);
@@ -348,10 +349,8 @@ process_exit (void) {
 		}
 		child_element = list_next(child_element);
 	}
-	// if (current_thread->fork_flag == 1){
-	// 	sema_down(&(current_thread->parent->exit_sema));
-	// }
 	process_cleanup ();
+	
 }
 
 /* Free the current process's resources. */

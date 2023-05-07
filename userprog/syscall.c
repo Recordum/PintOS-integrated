@@ -150,11 +150,15 @@ halt(){
 void
 exit(int status){
 	struct thread* current_thread = thread_current();
-	char* name = thread_current()->name;
+	char* name = current_thread->name;
 	current_thread->exit_status = status;
+	for (int i = 0 ; i < 200 ; i++){
+		close(i);
+	}
 	if (current_thread->open_file != NULL){
 		file_close(current_thread->open_file);
 	}
+	// palloc_free_page(current_thread->file_fdt);
 	printf("%s: exit(%d)\n",name, status);
 	thread_exit();
 }
@@ -206,7 +210,7 @@ open (const char *file) {
 		lock_release(&filesys_lock);
 		return -1;
 	}
-	for (int fd = 2; fd < 64; fd++)
+	for (int fd = 2; fd < 200; fd++)
 	{
 		if (current_thread->file_fdt[fd] == NULL){
 			current_thread->file_fdt[fd] = open_file;
@@ -224,7 +228,7 @@ close (int fd){
 	if(current_thread->file_fdt[fd] == NULL){
 		return;
 	}
-	file_allow_write(current_thread->file_fdt[fd]);
+	file_close(current_thread->file_fdt[fd]);
 	current_thread->file_fdt[fd] = NULL;
 }
 
