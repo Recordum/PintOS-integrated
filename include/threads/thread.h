@@ -106,6 +106,7 @@ struct thread {
 	struct semaphore fork_sema;
 	struct semaphore wait_sema;
 	struct semaphore exit_sema;
+	struct semaphore status_sema;
 	int fork_flag;
 	int exit_status;
 #ifdef USERPROG

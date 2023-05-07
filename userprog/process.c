@@ -321,8 +321,10 @@ process_wait (tid_t child_tid UNUSED) {
 	if (strcmp(current_thread->name, "main") != 0){
 		sema_up(&(current_thread->exit_sema));
 	}
+	if (!list_empty(&(current_thread->child_list)) && strcmp(current_thread->name, "main") != 0 ){
+		sema_down(&(current_thread->status_sema));
+	}
 	current_thread->wait_success_tid = child_tid;
-
 	return current_thread->exit_status;
 }
 
@@ -341,6 +343,7 @@ process_exit (void) {
 			sema_down(&(current_thread->parent->exit_sema));
 			current_thread->parent->exit_status = current_thread->exit_status;
 			list_remove(child_element);
+			sema_up(&(current_thread->parent->status_sema));
 			break;
 		}
 		child_element = list_next(child_element);

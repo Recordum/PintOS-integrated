@@ -487,6 +487,7 @@ init_thread (struct thread *t, const char *name, int priority) {
 	list_init(&t->child_list);
 	sema_init(&(t->wait_sema), 0);
 	sema_init(&(t->exit_sema), 0);
+	sema_init(&(t->status_sema), 0);
 	
 	// t->file_fdt = palloc_get_page(PAL_USER);
 	t->exec_file = "";
