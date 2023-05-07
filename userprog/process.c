@@ -197,7 +197,7 @@ __do_fork (void *aux) {
 	if (succ)
 		do_iret (&current->tf);
 error:
-	//semaup
+	sema_up(&(parent->fork_sema));
 	thread_exit ();
 }
 
