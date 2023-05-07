@@ -105,6 +105,8 @@ struct thread {
 	struct file** file_fdt;
 	struct semaphore fork_sema;
 	struct semaphore wait_sema;
+	struct semaphore exit_sema;
+	int fork_flag;
 	int exit_status;
 #ifdef USERPROG
 	/* Owned by userprog/process.c. */
@@ -116,11 +118,6 @@ struct thread {
 	/* Table for whole virtual memory owned by thread. */
 	struct supplemental_page_table spt;
 #endif
-
-	/* Owned by thread.c. */
-	struct intr_frame tf;               /* Information for switching */
-	unsigned magic;                     /* Detects stack overflow. */
-
 	// USERPROG
 	struct list child_list;				/*자식 프로세스 리스트*/
     struct list_elem child_elem;	
@@ -129,6 +126,11 @@ struct thread {
 	int wait_success_tid;
 	struct file* open_file;
 	char* exec_file;
+
+		/* Owned by thread.c. */
+	struct intr_frame tf;               /* Information for switching */
+	unsigned magic;                     /* Detects stack overflow. */
+
 };
 
 /* If false (default), use round-robin scheduler.

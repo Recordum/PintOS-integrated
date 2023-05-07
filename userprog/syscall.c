@@ -153,7 +153,7 @@ exit(int status){
 	char* name = thread_current()->name;
 	current_thread->parent->exit_status = status;
 	if (current_thread->open_file != NULL){
-		file_allow_write(current_thread->open_file);
+		file_close(current_thread->open_file);
 	}
 	printf("%s: exit(%d)\n",name, status);
 	thread_exit();
@@ -166,7 +166,6 @@ fork (const char *name, struct intr_frame *if_){
 
 int
 exec (const char *file) {
-	
 	return process_exec(file);
 }
 

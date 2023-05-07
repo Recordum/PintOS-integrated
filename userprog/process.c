@@ -191,12 +191,13 @@ __do_fork (void *aux) {
 	 * TODO:       from the fork() until this function successfully duplicates
 	 * TODO:       the resources of parent.*/
 	process_init ();
-	
+	current->fork_flag = 1;
 	sema_up(&(parent->fork_sema));
 	/* Finally, switch to the newly created process. */
 	if (succ)
 		do_iret (&current->tf);
 error:
+	//semaup
 	thread_exit ();
 }
 
@@ -314,8 +315,11 @@ process_wait (tid_t child_tid UNUSED) {
 	if (current_thread->wait_success_tid == child_tid){
 		return -1;
 	}
-	if (!list_empty(&(current_thread->child_list))){
+	if (!list_empty(&(current_thread->child_list)) ){
 		sema_down(&(current_thread->wait_sema));
+	}
+	if (strcmp(current_thread->name, "main") != 0){
+		sema_up(&(current_thread->exit_sema));
 	}
 	current_thread->wait_success_tid = child_tid;
 	return current_thread->exit_status;
@@ -337,6 +341,9 @@ process_exit (void) {
 			break;
 		}
 		child_element = list_next(child_element);
+	}
+	if (current_thread->fork_flag == 1){
+		sema_down(&(current_thread->parent->exit_sema));
 	}
 	process_cleanup ();
 }
