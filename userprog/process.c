@@ -83,14 +83,21 @@ tid_t
 process_fork (const char *name, struct intr_frame *if_) {
 	/* Clone current thread to new thread.*/
 	struct thread *current_thread = thread_current();
-	
 	sema_init(&(current_thread->fork_sema), 0);
 	/* 전달받은 intr_frame을 현재 parent_if에 복사 */
 	memcpy(&(current_thread->parent_if), if_, sizeof(struct intr_frame));
 	tid_t pid = thread_create(name, PRI_DEFAULT, __do_fork, current_thread);
-	
+	// printf("fork_seman_down\n");
 	sema_down(&(current_thread->fork_sema));
-	if (pid == TID_ERROR) {
+	printf("sema_free?\n");
+	struct thread* child_thread = find_child(pid);
+	if (pid == TID_ERROR ) {
+		return TID_ERROR;
+	}
+
+	if (child_thread->exit_status == -2){
+		// sema_up(&(child_thread->exit_sema));
+		// printf("sema_up?1\n");
 		return TID_ERROR;
 	}
 	
@@ -167,25 +174,33 @@ __do_fork (void *aux) {
 	
 	/* 2. Duplicate PT */
 	current->pml4 = pml4_create();
-	if (current->pml4 == NULL)
+	if (current->pml4 == NULL){
 		goto error;
-
+	}
 	process_activate (current);
 #ifdef VM
 	supplemental_page_table_init (&current->spt);
 	if (!supplemental_page_table_copy (&current->spt, &parent->spt))
 		goto error;
 #else
-	if (!pml4_for_each (parent->pml4, duplicate_pte, parent))
+	if (!pml4_for_each (parent->pml4, duplicate_pte, parent)){
 		goto error;
+	}
 #endif
 
-	for (size_t i = 0; i < 300; i++)
+	if (parent->last_fd >= MAX_FILE_DESCRIPTOR){
+		goto error;
+	}
+	printf("before file dup\n");
+	for (size_t i = 2; i < MAX_FILE_DESCRIPTOR; i++)
 	{
 		if (parent->file_fdt[i] != NULL){
 			current->file_fdt[i] = file_duplicate(parent->file_fdt[i]);
 		}
 	}
+	printf("after file dup\n");
+	current->last_fd = parent->last_fd;
+
 	
 	
 	/* TODO: Your code goes here.
@@ -193,15 +208,16 @@ __do_fork (void *aux) {
 	 * TODO:       in include/filesys/file.h. Note that parent should not return
 	 * TODO:       from the fork() until this function successfully duplicates
 	 * TODO:       the resources of parent.*/
+	sema_up(&(parent->fork_sema));
 	process_init ();
-	current->fork_flag = 1;
-	sema_up(&(parent->fork_sema));
 	/* Finally, switch to the newly created process. */
-	if (succ)
+	if (succ){
 		do_iret (&_if);
+	}
 error:
+	// printf("fork_error\n");
 	sema_up(&(parent->fork_sema));
-	thread_exit ();
+	exit(-2);
 }
 
 /* Switch the current execution context to the f_name.
@@ -247,9 +263,6 @@ process_exec (void *f_name) {
 	/* And then load the binary */
 	
 	success = load (file_name, &_if);
-
-	
-
 	/* If load failed, quit. */
 	if (!success)
 		// palloc_free_page (file_name);					
@@ -325,6 +338,7 @@ process_wait (tid_t child_tid UNUSED) {
 
 		child_thread = find_child(child_tid);
 		if (child_thread == NULL){
+			// printf("current_thread_name : %s\n", current_thread->name);
 			return -1;
 		}
 		sema_up(&(child_thread->exit_sema));
@@ -372,8 +386,13 @@ process_exit (void) {
 		}
 		child_element = list_next(child_element);
 	}
-
-	// palloc_free_page(current_thread->file_fdt);
+	for (int i = 2 ; i < MAX_FILE_DESCRIPTOR ; i++){
+		close(i);
+	}
+	if (current_thread->open_file != NULL){
+		file_close(current_thread->open_file);
+	}
+	palloc_free_multiple(current_thread->file_fdt, 3);
 	process_cleanup ();
 	
 }

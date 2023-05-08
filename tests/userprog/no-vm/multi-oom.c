@@ -110,6 +110,7 @@ make_children (void) {
     if (i > EXPECTED_DEPTH_TO_PASS/2) {
       snprintf (child_name, sizeof child_name, "%s_%d_%s", "child", i, "X");
       pid = fork(child_name);
+      // printf("xpid:%d\n",pid);
       if (pid > 0 && wait (pid) != -1) {
         fail ("crashed child should return -1.");
       } else if (pid == 0) {
@@ -117,9 +118,11 @@ make_children (void) {
         fail ("Unreachable");
       }
     }
-
+    
     snprintf (child_name, sizeof child_name, "%s_%d_%s", "child", i, "O");
+    printf("before fork pid : %d\n",pid);
     pid = fork(child_name);
+    printf("aftrer_fork pid:%d after_fork_name:%s\n",pid, child_name);
     if (pid < 0) {
       exit (i);
     } else if (pid == 0) {

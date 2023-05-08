@@ -28,7 +28,7 @@ typedef int tid_t;
 #define PRI_MIN 0                       /* Lowest priority. */
 #define PRI_DEFAULT 31                  /* Default priority. */
 #define PRI_MAX 63                      /* Highest priority. */
-
+#define MAX_FILE_DESCRIPTOR 3 * (1<<9)
 /* A kernel thread or user process.
  *
  * Each thread structure is stored in its own 4 kB page.  The
@@ -103,11 +103,12 @@ struct thread {
 	struct list_elem priority_elem;
 	struct list priority_list;
 	struct file** file_fdt;
+	int last_fd;
 	struct semaphore fork_sema;
 	struct semaphore wait_sema;
 	struct semaphore exit_sema;
 	struct semaphore status_sema;
-	int fork_flag;
+	struct semaphore load_sema;
 	int exit_status;
 #ifdef USERPROG
 	/* Owned by userprog/process.c. */

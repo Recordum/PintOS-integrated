@@ -210,6 +210,7 @@ thread_create (const char *name, int priority,
 	t->file_fdt = palloc_get_multiple(PAL_ZERO, 3);
 	list_push_back(&(parent_thread->child_list), &(t->child_elem));
 	/* Add to run queue. */
+	t->last_fd = 2;
 	thread_unblock (t);
 	
 	return tid;
@@ -488,6 +489,7 @@ init_thread (struct thread *t, const char *name, int priority) {
 	sema_init(&(t->wait_sema), 0);
 	sema_init(&(t->exit_sema), 0);
 	sema_init(&(t->status_sema), 0);
+	sema_init(&(t->load_sema), 0);
 	
 	// t->file_fdt = palloc_get_page(PAL_USER);
 	t->exec_file = "";

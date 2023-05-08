@@ -4,6 +4,7 @@
         "filesys.h": "c",
         "file.h": "c",
         "process.h": "c",
-        "synch.h": "c"
+        "synch.h": "c",
+        "*.inc": "c"
     }
 }

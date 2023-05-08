@@ -152,12 +152,6 @@ exit(int status){
 	struct thread* current_thread = thread_current();
 	char* name = current_thread->name;
 	current_thread->exit_status = status;
-	for (int i = 0 ; i < 200 ; i++){
-		close(i);
-	}
-	if (current_thread->open_file != NULL){
-		file_close(current_thread->open_file);
-	}
 	printf("%s: exit(%d)\n",name, status);
 	thread_exit();
 }
@@ -199,27 +193,31 @@ remove (const char *file) {
 
 int 
 open (const char *file) {
-	// lock_acquire(&filesys_lock);
+	check_address(file);
+	lock_acquire(&filesys_lock);
 	if (strcmp(file, "") == 0){
-		// lock_release(&filesys_lock);
+		lock_release(&filesys_lock);
 		return -1;
 	}
 	struct file *open_file = filesys_open(file);
 	struct thread *current_thread = thread_current();
 
 	if (open_file == NULL){
-		// lock_release(&filesys_lock);
+		lock_release(&filesys_lock);
 		return -1;
 	}
-	for (int fd = 2; fd < 200; fd++)
+
+	for (int fd = current_thread->last_fd; fd < MAX_FILE_DESCRIPTOR; fd++)
 	{
 		if (current_thread->file_fdt[fd] == NULL){
 			current_thread->file_fdt[fd] = open_file;
-			// lock_release(&filesys_lock);
+			current_thread->last_fd = fd;
+			lock_release(&filesys_lock);
 			return fd;
 		}
 	}
-	// lock_release(&filesys_lock);
+
+	lock_release(&filesys_lock);
 	return -1;		
 }
 
