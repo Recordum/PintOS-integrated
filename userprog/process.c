@@ -28,6 +28,7 @@ static bool load (const char *file_name, struct intr_frame *if_);
 static void initd (void *f_name);
 static void __do_fork (void *);
 void push_argument(char **argv, int argc, struct intr_frame *_if);
+struct thread* find_child(tid_t child_tid);
 
 /* General process initializer for initd and other process. */
 static void
@@ -157,11 +158,12 @@ __do_fork (void *aux) {
 	struct thread *current = thread_current ();
 	/* TODO: somehow pass the parent_if. (i.e. process_fork()'s if_) */
 	struct intr_frame parent_if = parent->parent_if;
+	struct intr_frame _if;
 	bool succ = true;
 
 	/* 1. Read the cpu context to local stack. */
-	memcpy (&current->tf, &parent_if, sizeof (struct intr_frame));
-	current->tf.R.rax = 0;
+	memcpy (&_if, &parent_if, sizeof (struct intr_frame));
+	_if.R.rax = 0;
 	
 	/* 2. Duplicate PT */
 	current->pml4 = pml4_create();
@@ -178,12 +180,13 @@ __do_fork (void *aux) {
 		goto error;
 #endif
 
-	for (size_t i = 0; i < 64; i++)
+	for (size_t i = 0; i < 300; i++)
 	{
 		if (parent->file_fdt[i] != NULL){
 			current->file_fdt[i] = file_duplicate(parent->file_fdt[i]);
 		}
 	}
+	
 	
 	/* TODO: Your code goes here.
 	 * TODO: Hint) To duplicate the file object, use `file_duplicate`
@@ -195,7 +198,7 @@ __do_fork (void *aux) {
 	sema_up(&(parent->fork_sema));
 	/* Finally, switch to the newly created process. */
 	if (succ)
-		do_iret (&current->tf);
+		do_iret (&_if);
 error:
 	sema_up(&(parent->fork_sema));
 	thread_exit ();
@@ -207,7 +210,7 @@ int
 process_exec (void *f_name) {
 	const int MAX_ARGUMENTS = 128;
 	struct thread* current_thread = thread_current();
-	strlcpy(current_thread->exec_file, f_name, strlen(f_name)+1);
+
 	char *file_name;
 	bool success;
 	char *token;
@@ -225,13 +228,11 @@ process_exec (void *f_name) {
 	
 	/* We first kill the current context */
 	process_cleanup ();
-	char *input_str = palloc_get_page(PAL_USER);
+	
 	
 	current_thread = thread_current();
-
-	strlcpy(input_str, current_thread->exec_file, strlen(current_thread->exec_file)+1);
 	
-	argv[argc] = strtok_r(input_str, " ", &saveptr);
+	argv[argc] = strtok_r(f_name, " ", &saveptr);
 	argc++;
 
 	while(true){
@@ -313,6 +314,7 @@ push_argument(char** argv, int argc, struct intr_frame *_if){
 int
 process_wait (tid_t child_tid UNUSED) {
 	struct thread* current_thread = thread_current();
+	struct thread* child_thread ;
 	if (current_thread->wait_success_tid == child_tid){
 		return -1;
 	}
@@ -320,13 +322,34 @@ process_wait (tid_t child_tid UNUSED) {
 		sema_down(&(current_thread->wait_sema));
 	}
 	if (strcmp(current_thread->name, "main") != 0){
-		sema_up(&(current_thread->exit_sema));
+
+		child_thread = find_child(child_tid);
+		if (child_thread == NULL){
+			return -1;
+		}
+		sema_up(&(child_thread->exit_sema));
 	}
 	if (!list_empty(&(current_thread->child_list)) && strcmp(current_thread->name, "main") != 0 ){
 		sema_down(&(current_thread->status_sema));
 	}
 	current_thread->wait_success_tid = child_tid;
 	return current_thread->exit_status;
+}
+
+struct thread*
+find_child(tid_t child_tid){
+	struct thread* current_thread = thread_current();
+	struct list_elem *child_element = list_begin(&(current_thread->child_list));
+	if (child_element == list_end(&(current_thread->child_list))){
+		return NULL;
+	}
+	while(true){
+		struct thread *child_thread = list_entry(child_element, struct thread, child_elem);
+		if (child_thread->tid == child_tid){
+			return child_thread;
+		}
+		child_element = list_next(child_element);
+	}
 }
 
 /* Exit the process. This function is called by thread_exit (). */
@@ -341,7 +364,7 @@ process_exit (void) {
 		}
 		struct thread *child_thread = list_entry(child_element, struct thread, child_elem);
 		if (child_thread == current_thread){
-			sema_down(&(current_thread->parent->exit_sema));
+			sema_down(&(current_thread->exit_sema));
 			current_thread->parent->exit_status = current_thread->exit_status;
 			list_remove(child_element);
 			sema_up(&(current_thread->parent->status_sema));
@@ -349,6 +372,8 @@ process_exit (void) {
 		}
 		child_element = list_next(child_element);
 	}
+
+	// palloc_free_page(current_thread->file_fdt);
 	process_cleanup ();
 	
 }
@@ -541,6 +566,9 @@ load (const char *file_name, struct intr_frame *if_) {
 		}
 	}
 
+	file_deny_write(file);
+	thread_current()->open_file = file;
+
 	/* Set up stack. */
 	if (!setup_stack (if_))
 		goto done;
@@ -550,8 +578,7 @@ load (const char *file_name, struct intr_frame *if_) {
 
 	/* TODO: Your code goes here.
 	 * TODO: Implement argument passing (see project2/argument_passing.html). */
-	file_deny_write(file);
-	thread_current()->open_file = file;
+	
 
 	success = true;
 

@@ -207,7 +207,7 @@ thread_create (const char *name, int priority,
 	t->tf.cs = SEL_KCSEG;
 	t->tf.eflags = FLAG_IF;
 	t->parent = parent_thread;
-	t->file_fdt = palloc_get_page(PAL_ZERO);
+	t->file_fdt = palloc_get_multiple(PAL_ZERO, 3);
 	list_push_back(&(parent_thread->child_list), &(t->child_elem));
 	/* Add to run queue. */
 	thread_unblock (t);

@@ -158,7 +158,6 @@ exit(int status){
 	if (current_thread->open_file != NULL){
 		file_close(current_thread->open_file);
 	}
-	// palloc_free_page(current_thread->file_fdt);
 	printf("%s: exit(%d)\n",name, status);
 	thread_exit();
 }
@@ -170,7 +169,9 @@ fork (const char *name, struct intr_frame *if_){
 
 int
 exec (const char *file) {
-	return process_exec(file);
+	char *input_str = palloc_get_page(0);
+	strlcpy(input_str, file, strlen(file)+1);
+	return process_exec(input_str);
 }
 
 int
@@ -198,27 +199,27 @@ remove (const char *file) {
 
 int 
 open (const char *file) {
-	lock_acquire(&filesys_lock);
+	// lock_acquire(&filesys_lock);
 	if (strcmp(file, "") == 0){
-		lock_release(&filesys_lock);
+		// lock_release(&filesys_lock);
 		return -1;
 	}
 	struct file *open_file = filesys_open(file);
 	struct thread *current_thread = thread_current();
 
 	if (open_file == NULL){
-		lock_release(&filesys_lock);
+		// lock_release(&filesys_lock);
 		return -1;
 	}
 	for (int fd = 2; fd < 200; fd++)
 	{
 		if (current_thread->file_fdt[fd] == NULL){
 			current_thread->file_fdt[fd] = open_file;
-			lock_release(&filesys_lock);
+			// lock_release(&filesys_lock);
 			return fd;
 		}
 	}
-	lock_release(&filesys_lock);
+	// lock_release(&filesys_lock);
 	return -1;		
 }
 
@@ -267,7 +268,6 @@ write (int fd, const void *buffer, unsigned size){
 
 	size = file_write(file_object, buffer, size);
 	lock_release(&filesys_lock);
-
 	return size;
 }
 
