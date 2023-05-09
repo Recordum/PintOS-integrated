@@ -89,7 +89,7 @@ process_fork (const char *name, struct intr_frame *if_) {
 	tid_t pid = thread_create(name, PRI_DEFAULT, __do_fork, current_thread);
 	// printf("fork_seman_down\n");
 	sema_down(&(current_thread->fork_sema));
-	printf("sema_free?\n");
+	// printf("sema_free?\n");
 	struct thread* child_thread = find_child(pid);
 	if (pid == TID_ERROR ) {
 		return TID_ERROR;
@@ -191,14 +191,14 @@ __do_fork (void *aux) {
 	if (parent->last_fd >= MAX_FILE_DESCRIPTOR){
 		goto error;
 	}
-	printf("before file dup\n");
+
 	for (size_t i = 2; i < MAX_FILE_DESCRIPTOR; i++)
 	{
 		if (parent->file_fdt[i] != NULL){
 			current->file_fdt[i] = file_duplicate(parent->file_fdt[i]);
 		}
 	}
-	printf("after file dup\n");
+	
 	current->last_fd = parent->last_fd;
 
 	

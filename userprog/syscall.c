@@ -11,6 +11,7 @@
 #include "filesys/file.h"
 #include "threads/palloc.h"
 
+int process_add_file (struct file *f);
 void syscall_entry (void);
 void syscall_handler (struct intr_frame *);
 void check_address(void *addr);
@@ -206,8 +207,8 @@ open (const char *file) {
 		lock_release(&filesys_lock);
 		return -1;
 	}
-
-	for (int fd = current_thread->last_fd; fd < MAX_FILE_DESCRIPTOR; fd++)
+	int fd;
+	for (fd = current_thread->last_fd; fd < MAX_FILE_DESCRIPTOR; fd++)
 	{
 		if (current_thread->file_fdt[fd] == NULL){
 			current_thread->file_fdt[fd] = open_file;
@@ -216,10 +217,37 @@ open (const char *file) {
 			return fd;
 		}
 	}
+	current_thread->last_fd = fd;
 
-	lock_release(&filesys_lock);
-	return -1;		
+	// int last_fd = process_add_file(open_file);
+	// if (last_fd == -1){
+	file_close(open_file);
+		// return -1;
+	// }
+	// return last_fd;
+	lock_release(&filesys_lock);		
+	return -1;
 }
+
+int process_add_file (struct file *f){ //FDCOUNT_LIMIT
+/* 파일 객체를 파일 디스크립터 테이블에 추가*/
+    struct thread *curr = thread_current();
+  //파일 디스크립터 테이블에서 비어있는 자리를 찾습니다.
+    while (curr->last_fd < MAX_FILE_DESCRIPTOR  && curr->file_fdt[curr->last_fd] != NULL) {
+        curr->last_fd++;
+    }
+    // 파일 디스크립터 테이블이 꽉 찬 경우 에러를 반환
+    if (curr->last_fd >= MAX_FILE_DESCRIPTOR ) {
+        return -1;
+    }
+    curr->file_fdt[curr->last_fd] = f;
+    return curr->last_fd;
+}
+
+
+
+
+
 
 void 
 close (int fd){
