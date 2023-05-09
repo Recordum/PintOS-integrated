@@ -9,16 +9,17 @@
 #include "intrinsic.h"
 #include "filesys/filesys.h"
 #include "filesys/file.h"
+#include "threads/palloc.h"
 
-
+int process_add_file (struct file *f);
 void syscall_entry (void);
 void syscall_handler (struct intr_frame *);
 void check_address(void *addr);
 void halt();
 void exit(int status);
-// pid_t fork (const char *thread_name);
-// int exec (const char *file); 
-// int wait (pid_t pid);
+tid_t fork (const char *name, struct intr_frame *if_);
+int exec (const char *file); 
+int wait (tid_t pid);
 bool create (const char *file, unsigned initial_size);
 bool remove (const char *file);
 int open (const char *file);
@@ -87,6 +88,7 @@ syscall_handler (struct intr_frame *f) {
 		f->R.rax = fork(ARG0, f);
 		break;
 	case SYS_EXEC:
+		f->R.rax = exec(ARG0);
 		break;
 	case SYS_WAIT:
 		f->R.rax = wait(ARG0);
@@ -130,7 +132,13 @@ syscall_handler (struct intr_frame *f) {
 void
 check_address(void *addr) {
 	struct thread *t = thread_current();
-	if (addr == NULL||!is_user_vaddr(addr)||pml4_get_page(t->pml4, addr)== NULL) {								
+	if (addr == NULL) {								
+		exit(-1);
+	}
+	if(is_kernel_vaddr(addr)){
+		exit(-1);
+	}
+	if(pml4_get_page(t->pml4, addr) == NULL){
 		exit(-1);
 	}
 }
@@ -143,10 +151,9 @@ halt(){
 void
 exit(int status){
 	struct thread* current_thread = thread_current();
-	char* name = thread_current()->name;
+	char* name = current_thread->name;
+	current_thread->exit_status = status;
 	printf("%s: exit(%d)\n",name, status);
-	current_thread->parent->exit_status = status;
-	sema_up(&(current_thread->parent->wait_sema));
 	thread_exit();
 }
 
@@ -154,12 +161,13 @@ tid_t
 fork (const char *name, struct intr_frame *if_){
 	return process_fork(name, if_);
 }
-// ​
-// /*현재 프로세스를 cmd_line에서 지정된 인수를 전달하여 이름이 지정된 실행 파일로 변경*/
-// int
-// exec (const char *file) {
-// 	check_address(file);
-// }
+
+int
+exec (const char *file) {
+	char *input_str = palloc_get_page(0);
+	strlcpy(input_str, file, strlen(file)+1);
+	return process_exec(input_str);
+}
 
 int
 wait(tid_t pid){
@@ -186,30 +194,68 @@ remove (const char *file) {
 
 int 
 open (const char *file) {
-	
+	check_address(file);
+	lock_acquire(&filesys_lock);
 	if (strcmp(file, "") == 0){
+		lock_release(&filesys_lock);
 		return -1;
 	}
 	struct file *open_file = filesys_open(file);
 	struct thread *current_thread = thread_current();
 
 	if (open_file == NULL){
+		lock_release(&filesys_lock);
 		return -1;
 	}
-
-	for (int fd = 2; fd < 64; fd++)
+	int fd;
+	for (fd = current_thread->last_fd; fd < MAX_FILE_DESCRIPTOR; fd++)
 	{
 		if (current_thread->file_fdt[fd] == NULL){
 			current_thread->file_fdt[fd] = open_file;
+			current_thread->last_fd = fd;
+			lock_release(&filesys_lock);
 			return fd;
 		}
 	}
-	return -1;		
+	current_thread->last_fd = fd;
+
+	// int last_fd = process_add_file(open_file);
+	// if (last_fd == -1){
+	file_close(open_file);
+		// return -1;
+	// }
+	// return last_fd;
+	lock_release(&filesys_lock);		
+	return -1;
 }
+
+int process_add_file (struct file *f){ //FDCOUNT_LIMIT
+/* 파일 객체를 파일 디스크립터 테이블에 추가*/
+    struct thread *curr = thread_current();
+  //파일 디스크립터 테이블에서 비어있는 자리를 찾습니다.
+    while (curr->last_fd < MAX_FILE_DESCRIPTOR  && curr->file_fdt[curr->last_fd] != NULL) {
+        curr->last_fd++;
+    }
+    // 파일 디스크립터 테이블이 꽉 찬 경우 에러를 반환
+    if (curr->last_fd >= MAX_FILE_DESCRIPTOR ) {
+        return -1;
+    }
+    curr->file_fdt[curr->last_fd] = f;
+    return curr->last_fd;
+}
+
+
+
+
+
 
 void 
 close (int fd){
 	struct thread* current_thread = thread_current();
+	if(current_thread->file_fdt[fd] == NULL){
+		return;
+	}
+	file_close(current_thread->file_fdt[fd]);
 	current_thread->file_fdt[fd] = NULL;
 }
 
@@ -221,6 +267,7 @@ read(int fd, void *buffer, unsigned size){
 		lock_release(&filesys_lock);	
 		return size;
 	}
+
 	struct thread* current_thread = thread_current();
 	struct file *file_object = current_thread->file_fdt[fd];
 	size = file_read(file_object, buffer, size);
@@ -247,7 +294,6 @@ write (int fd, const void *buffer, unsigned size){
 
 	size = file_write(file_object, buffer, size);
 	lock_release(&filesys_lock);
-
 	return size;
 }
 

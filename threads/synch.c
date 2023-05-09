@@ -281,7 +281,7 @@ lock_release (struct lock *lock) {
 	ASSERT (lock_held_by_current_thread (lock));
 	struct thread* current_thread = thread_current();
 	list_remove(&lock->lock_elem);
-	if(current_thread != idle_thread){
+	if(current_thread != idle_thread && !list_empty(&(current_thread->priority_list))){
 		give_back_prioirty(lock, current_thread);
 	}
 	lock->holder = NULL;

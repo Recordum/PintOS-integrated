@@ -28,6 +28,7 @@ static bool load (const char *file_name, struct intr_frame *if_);
 static void initd (void *f_name);
 static void __do_fork (void *);
 void push_argument(char **argv, int argc, struct intr_frame *_if);
+struct thread* find_child(tid_t child_tid);
 
 /* General process initializer for initd and other process. */
 static void
@@ -82,18 +83,24 @@ tid_t
 process_fork (const char *name, struct intr_frame *if_) {
 	/* Clone current thread to new thread.*/
 	struct thread *current_thread = thread_current();
-	
 	sema_init(&(current_thread->fork_sema), 0);
 	/* 전달받은 intr_frame을 현재 parent_if에 복사 */
 	memcpy(&(current_thread->parent_if), if_, sizeof(struct intr_frame));
 	tid_t pid = thread_create(name, PRI_DEFAULT, __do_fork, current_thread);
-
+	// printf("fork_seman_down\n");
 	sema_down(&(current_thread->fork_sema));
-	if (pid == TID_ERROR) {
+	// printf("sema_free?\n");
+	struct thread* child_thread = find_child(pid);
+	if (pid == TID_ERROR ) {
 		return TID_ERROR;
 	}
-	// return thread_create (name,
-	// 		PRI_DEFAULT, __do_fork, thread_current ());
+
+	if (child_thread->exit_status == -2){
+		// sema_up(&(child_thread->exit_sema));
+		// printf("sema_up?1\n");
+		return TID_ERROR;
+	}
+	
 	return pid;
 }
 
@@ -154,52 +161,63 @@ duplicate_pte (uint64_t *pte, void *va, void *aux) {
  */
 static void
 __do_fork (void *aux) {
-	struct intr_frame if_;
 	struct thread *parent = (struct thread *) aux;
 	struct thread *current = thread_current ();
 	/* TODO: somehow pass the parent_if. (i.e. process_fork()'s if_) */
 	struct intr_frame parent_if = parent->parent_if;
+	struct intr_frame _if;
 	bool succ = true;
 
 	/* 1. Read the cpu context to local stack. */
-	memcpy (&current->tf, &parent_if, sizeof (struct intr_frame));
-	current->tf.R.rax = 0;
+	memcpy (&_if, &parent_if, sizeof (struct intr_frame));
+	_if.R.rax = 0;
 	
 	/* 2. Duplicate PT */
 	current->pml4 = pml4_create();
-	if (current->pml4 == NULL)
+	if (current->pml4 == NULL){
 		goto error;
-
+	}
 	process_activate (current);
 #ifdef VM
 	supplemental_page_table_init (&current->spt);
 	if (!supplemental_page_table_copy (&current->spt, &parent->spt))
 		goto error;
 #else
-	if (!pml4_for_each (parent->pml4, duplicate_pte, parent))
+	if (!pml4_for_each (parent->pml4, duplicate_pte, parent)){
 		goto error;
+	}
 #endif
 
-	for (size_t i = 0; i < 64; i++)
+	if (parent->last_fd >= MAX_FILE_DESCRIPTOR){
+		goto error;
+	}
+
+	for (size_t i = 2; i < MAX_FILE_DESCRIPTOR; i++)
 	{
 		if (parent->file_fdt[i] != NULL){
 			current->file_fdt[i] = file_duplicate(parent->file_fdt[i]);
 		}
 	}
 	
+	current->last_fd = parent->last_fd;
+
+	
+	
 	/* TODO: Your code goes here.
 	 * TODO: Hint) To duplicate the file object, use `file_duplicate`
 	 * TODO:       in include/filesys/file.h. Note that parent should not return
 	 * TODO:       from the fork() until this function successfully duplicates
 	 * TODO:       the resources of parent.*/
-	process_init ();
-	
 	sema_up(&(parent->fork_sema));
+	process_init ();
 	/* Finally, switch to the newly created process. */
-	if (succ)
-		do_iret (&current->tf);
+	if (succ){
+		do_iret (&_if);
+	}
 error:
-	thread_exit ();
+	// printf("fork_error\n");
+	sema_up(&(parent->fork_sema));
+	exit(-2);
 }
 
 /* Switch the current execution context to the f_name.
@@ -207,13 +225,15 @@ error:
 int
 process_exec (void *f_name) {
 	const int MAX_ARGUMENTS = 128;
-	char *input_str = f_name;
+	struct thread* current_thread = thread_current();
+
 	char *file_name;
 	bool success;
 	char *token;
 	int argc = 0;
 	char *saveptr;
 	char *argv[MAX_ARGUMENTS];
+	
 	/* We cannot use the intr_frame in the thread structure.
 	 * This is because when current thread rescheduled,
 	 * it stores the execution information to the member. */
@@ -225,28 +245,32 @@ process_exec (void *f_name) {
 	/* We first kill the current context */
 	process_cleanup ();
 	
-	argv[argc] = strtok_r(input_str, " ", &saveptr);
+	
+	current_thread = thread_current();
+	
+	argv[argc] = strtok_r(f_name, " ", &saveptr);
 	argc++;
+
 	while(true){
 		argv[argc] = strtok_r(NULL, " ", &saveptr);
-		if (argv[argc] == NULL || argc >= MAX_ARGUMENTS){
+ 		if (argv[argc] == NULL || argc >= MAX_ARGUMENTS){
 			break;
 		}
 		argc++;
 	}
-
+	
 	file_name = argv[0];
 	/* And then load the binary */
-	success = load (file_name, &_if);
 	
+	success = load (file_name, &_if);
+	/* If load failed, quit. */
+	if (!success)
+		// palloc_free_page (file_name);					
+    	return -1;
+
 	push_argument(argv ,argc, &_if);
 	
-	/* If load failed, quit. */
-	palloc_free_page (file_name);	//
-	if (!success)					
-		return -1;
-	//missing_part;
-	uint64_t syscall_number = _if.R.rax;
+	palloc_free_page (file_name);
 	/* Start switched process. */
 	do_iret (&_if);					
 	NOT_REACHED ();
@@ -303,24 +327,74 @@ push_argument(char** argv, int argc, struct intr_frame *_if){
 int
 process_wait (tid_t child_tid UNUSED) {
 	struct thread* current_thread = thread_current();
-	sema_down(&(current_thread->wait_sema));
-	/* XXX: Hint) The pintos exit if process_wait (initd), we recommend you
-	 * XXX:       to add infinite loop here before
-	 * XXX:       implementing the process_wait. */
-	//schedule
+	struct thread* child_thread ;
+	if (current_thread->wait_success_tid == child_tid){
+		return -1;
+	}
+	if (!list_empty(&(current_thread->child_list)) ){
+		sema_down(&(current_thread->wait_sema));
+	}
+	if (strcmp(current_thread->name, "main") != 0){
+
+		child_thread = find_child(child_tid);
+		if (child_thread == NULL){
+			// printf("current_thread_name : %s\n", current_thread->name);
+			return -1;
+		}
+		sema_up(&(child_thread->exit_sema));
+	}
+	if (!list_empty(&(current_thread->child_list)) && strcmp(current_thread->name, "main") != 0 ){
+		sema_down(&(current_thread->status_sema));
+	}
+	current_thread->wait_success_tid = child_tid;
 	return current_thread->exit_status;
+}
+
+struct thread*
+find_child(tid_t child_tid){
+	struct thread* current_thread = thread_current();
+	struct list_elem *child_element = list_begin(&(current_thread->child_list));
+	if (child_element == list_end(&(current_thread->child_list))){
+		return NULL;
+	}
+	while(true){
+		struct thread *child_thread = list_entry(child_element, struct thread, child_elem);
+		if (child_thread->tid == child_tid){
+			return child_thread;
+		}
+		child_element = list_next(child_element);
+	}
 }
 
 /* Exit the process. This function is called by thread_exit (). */
 void
 process_exit (void) {
-	struct thread *curr = thread_current ();
-	/* TODO: Your code goes here.
-	 * TODO: Implement process termination message (see
-	 * TODO: project2/process_termination.html).
-	 * TODO: We recommend you to implement process resource cleanup here. */
-
+	struct thread* current_thread = thread_current();
+	sema_up(&(current_thread->parent->wait_sema));
+	struct list_elem *child_element = list_begin(&(current_thread->parent->child_list));
+	while(true){
+		if (child_element == list_end(&(current_thread->parent->child_list))){
+			break;
+		}
+		struct thread *child_thread = list_entry(child_element, struct thread, child_elem);
+		if (child_thread == current_thread){
+			sema_down(&(current_thread->exit_sema));
+			current_thread->parent->exit_status = current_thread->exit_status;
+			list_remove(child_element);
+			sema_up(&(current_thread->parent->status_sema));
+			break;
+		}
+		child_element = list_next(child_element);
+	}
+	for (int i = 2 ; i < MAX_FILE_DESCRIPTOR ; i++){
+		close(i);
+	}
+	if (current_thread->open_file != NULL){
+		file_close(current_thread->open_file);
+	}
+	palloc_free_multiple(current_thread->file_fdt, 3);
 	process_cleanup ();
+	
 }
 
 /* Free the current process's resources. */
@@ -511,6 +585,9 @@ load (const char *file_name, struct intr_frame *if_) {
 		}
 	}
 
+	file_deny_write(file);
+	thread_current()->open_file = file;
+
 	/* Set up stack. */
 	if (!setup_stack (if_))
 		goto done;
@@ -521,11 +598,12 @@ load (const char *file_name, struct intr_frame *if_) {
 	/* TODO: Your code goes here.
 	 * TODO: Implement argument passing (see project2/argument_passing.html). */
 	
+
 	success = true;
 
 done:
 	/* We arrive here whether the load is successful or not. */
-	file_close (file);
+	// file_close (file);
 	return success;
 }
 

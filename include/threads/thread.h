@@ -28,7 +28,7 @@ typedef int tid_t;
 #define PRI_MIN 0                       /* Lowest priority. */
 #define PRI_DEFAULT 31                  /* Default priority. */
 #define PRI_MAX 63                      /* Highest priority. */
-
+#define MAX_FILE_DESCRIPTOR 3 * (1<<9)
 /* A kernel thread or user process.
  *
  * Each thread structure is stored in its own 4 kB page.  The
@@ -102,10 +102,13 @@ struct thread {
 	struct lock *wait_lock;
 	struct list_elem priority_elem;
 	struct list priority_list;
-	struct file* file_fdt[64];
+	struct file** file_fdt;
+	int last_fd;
 	struct semaphore fork_sema;
 	struct semaphore wait_sema;
-	int next_fd;
+	struct semaphore exit_sema;
+	struct semaphore status_sema;
+	struct semaphore load_sema;
 	int exit_status;
 #ifdef USERPROG
 	/* Owned by userprog/process.c. */
@@ -117,16 +120,19 @@ struct thread {
 	/* Table for whole virtual memory owned by thread. */
 	struct supplemental_page_table spt;
 #endif
-
-	/* Owned by thread.c. */
-	struct intr_frame tf;               /* Information for switching */
-	unsigned magic;                     /* Detects stack overflow. */
-
 	// USERPROG
 	struct list child_list;				/*자식 프로세스 리스트*/
     struct list_elem child_elem;	
 	struct intr_frame parent_if;        /* 자식에게 넘겨줄 intr_frame 프로세스의 정보를 가진 자료구조 */
 	struct thread *parent;
+	int wait_success_tid;
+	struct file* open_file;
+	char* exec_file;
+
+		/* Owned by thread.c. */
+	struct intr_frame tf;               /* Information for switching */
+	unsigned magic;                     /* Detects stack overflow. */
+
 };
 
 /* If false (default), use round-robin scheduler.

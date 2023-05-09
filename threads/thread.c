@@ -207,9 +207,10 @@ thread_create (const char *name, int priority,
 	t->tf.cs = SEL_KCSEG;
 	t->tf.eflags = FLAG_IF;
 	t->parent = parent_thread;
-	
+	t->file_fdt = palloc_get_multiple(PAL_ZERO, 3);
 	list_push_back(&(parent_thread->child_list), &(t->child_elem));
 	/* Add to run queue. */
+	t->last_fd = 2;
 	thread_unblock (t);
 	
 	return tid;
@@ -486,8 +487,13 @@ init_thread (struct thread *t, const char *name, int priority) {
 	list_init(&t->possesion_lock_list);
 	list_init(&t->child_list);
 	sema_init(&(t->wait_sema), 0);
-	// memset(t->fork_sema, 0, sizeof(struct semaphore*));
-	t->next_fd = 2;
+	sema_init(&(t->exit_sema), 0);
+	sema_init(&(t->status_sema), 0);
+	sema_init(&(t->load_sema), 0);
+	
+	// t->file_fdt = palloc_get_page(PAL_USER);
+	t->exec_file = "";
+	t->exit_status = -1;
 }
 
 /* Chooses and returns the next thread to be scheduled.  Should
