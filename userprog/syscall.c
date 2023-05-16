@@ -11,21 +11,21 @@
 #include "filesys/file.h"
 #include "threads/palloc.h"
 
-int process_add_file (struct file *f);
-void syscall_entry (void);
-void syscall_handler (struct intr_frame *);
+int process_add_file(struct file *f);
+void syscall_entry(void);
+void syscall_handler(struct intr_frame *);
 void check_address(void *addr);
 void halt();
 void exit(int status);
-tid_t fork (const char *name, struct intr_frame *if_);
-int exec (const char *file); 
-int wait (tid_t pid);
-bool create (const char *file, unsigned initial_size);
-bool remove (const char *file);
-int open (const char *file);
-void close (int fd);
+tid_t fork(const char *name, struct intr_frame *if_);
+int exec(const char *file);
+int wait(tid_t pid);
+bool create(const char *file, unsigned initial_size);
+bool remove(const char *file);
+int open(const char *file);
+void close(int fd);
 int read(int fd, void *buffer, unsigned size);
-int write (int fd, const void *buffer, unsigned size);
+int write(int fd, const void *buffer, unsigned size);
 
 /* System call.
  *
@@ -36,43 +36,43 @@ int write (int fd, const void *buffer, unsigned size);
  * The syscall instruction works by reading the values from the the Model
  * Specific Register (MSR). For the details, see the manual. */
 
-#define MSR_STAR 0xc0000081         /* Segment selector msr */
-#define MSR_LSTAR 0xc0000082        /* Long mode SYSCALL target */
+#define MSR_STAR 0xc0000081			/* Segment selector msr */
+#define MSR_LSTAR 0xc0000082		/* Long mode SYSCALL target */
 #define MSR_SYSCALL_MASK 0xc0000084 /* Mask for the eflags */
 
 struct lock filesys_lock;
 
-
-syscall_init (void) {
+syscall_init(void)
+{
 	lock_init(&filesys_lock);
-	write_msr(MSR_STAR, ((uint64_t)SEL_UCSEG - 0x10) << 48  |
-			((uint64_t)SEL_KCSEG) << 32);
-	write_msr(MSR_LSTAR, (uint64_t) syscall_entry);
+	write_msr(MSR_STAR, ((uint64_t)SEL_UCSEG - 0x10) << 48 |
+							((uint64_t)SEL_KCSEG) << 32);
+	write_msr(MSR_LSTAR, (uint64_t)syscall_entry);
 
-	
 	/* The interrupt service rountine should not serve any interrupts
 	 * until the syscall_entry swaps the userland stack to the kernel
 	 * mode stack. Therefore, we masked the FLAG_FL. */
 	write_msr(MSR_SYSCALL_MASK,
-			FLAG_IF | FLAG_TF | FLAG_DF | FLAG_IOPL | FLAG_AC | FLAG_NT);
+			  FLAG_IF | FLAG_TF | FLAG_DF | FLAG_IOPL | FLAG_AC | FLAG_NT);
 }
 // intr_register_int (0x30, 3, INTR_ON, syscall_handler, "syscall");
 /* The main system call interface */
 
-void
-syscall_handler (struct intr_frame *f) {
+void syscall_handler(struct intr_frame *f)
+{
 	// TODO: Your implementation goes here.
 	// syscall_number에 따라 systemcall(HALT,exec,./..)
 	/*check validation*/
-	struct thread* curr = thread_current();
+	struct thread *curr = thread_current();
+	curr->user_rsp = f->rsp;
 	uint64_t syscall_number = f->R.rax;
 	uint64_t rsp = f->rsp;
 	uint64_t ARG0 = f->R.rdi;
 	uint64_t ARG1 = f->R.rsi;
 	uint64_t ARG2 = f->R.rdx;
 	uint64_t ARG3 = f->R.r10;
-	uint64_t ARG4 = f->R.r8;
-	uint64_t ARG5 = f->R.r9;
+	uint64_t ARG4 = f->R.r9;
+	uint64_t ARG5 = f->R.r8;
 
 	check_address(rsp);
 
@@ -94,7 +94,7 @@ syscall_handler (struct intr_frame *f) {
 		f->R.rax = wait(ARG0);
 		break;
 	case SYS_CREATE:
-		f->R.rax = create(ARG0,ARG1);
+		f->R.rax = create(ARG0, ARG1);
 		break;
 	case SYS_REMOVE:
 		f->R.rax = remove(ARG0);
@@ -121,63 +121,66 @@ syscall_handler (struct intr_frame *f) {
 		close(ARG0);
 		break;
 	default:
-		thread_exit ();
+		thread_exit();
 	}
 
 	// printf ("system call!\n");
-	// 
+	//
 }
 
-
-void
-check_address(void *addr) {
+void check_address(void *addr)
+{
 	struct thread *t = thread_current();
-	if (addr == NULL) {								
+	if (addr == NULL)
+	{
 		exit(-1);
 	}
-	if(is_kernel_vaddr(addr)){
+	if (is_kernel_vaddr(addr))
+	{
 		exit(-1);
 	}
-	if(pml4_get_page(t->pml4, addr) == NULL){
+	if (pml4_get_page(t->pml4, addr) == NULL)
+	{
 		exit(-1);
 	}
 }
 
-void
-halt(){
+void halt()
+{
 	power_off();
 }
 
-void
-exit(int status){
-	struct thread* current_thread = thread_current();
-	char* name = current_thread->name;
+void exit(int status)
+{
+	struct thread *current_thread = thread_current();
+	char *name = current_thread->name;
 	current_thread->exit_status = status;
-	printf("%s: exit(%d)\n",name, status);
+	printf("%s: exit(%d)\n", name, status);
 	thread_exit();
 }
 
-tid_t
-fork (const char *name, struct intr_frame *if_){
+tid_t fork(const char *name, struct intr_frame *if_)
+{
 	return process_fork(name, if_);
 }
 
-int
-exec (const char *file) {
+int exec(const char *file)
+{
 	char *input_str = palloc_get_page(0);
-	strlcpy(input_str, file, strlen(file)+1);
+	strlcpy(input_str, file, strlen(file) + 1);
 	return process_exec(input_str);
 }
 
-int
-wait(tid_t pid){
+int wait(tid_t pid)
+{
 	return process_wait(pid);
 }
 
-bool
-create (const char *file, unsigned initial_size) {
+bool create(const char *file, unsigned initial_size)
+{
 	lock_acquire(&filesys_lock);
-	if (!strcmp(file,"")){
+	if (!strcmp(file, ""))
+	{
 		exit(-1);
 	}
 	check_address(file);
@@ -187,30 +190,33 @@ create (const char *file, unsigned initial_size) {
 	return create_result;
 }
 
-bool
-remove (const char *file) {	
-	return filesys_remove(file);				//파일 시스템에서 file 이름을 가진 파일을 삭제하는 함수
+bool remove(const char *file)
+{
+	return filesys_remove(file); // 파일 시스템에서 file 이름을 가진 파일을 삭제하는 함수
 }
 
-int 
-open (const char *file) {
+int open(const char *file)
+{
 	check_address(file);
 	lock_acquire(&filesys_lock);
-	if (strcmp(file, "") == 0){
+	if (strcmp(file, "") == 0)
+	{
 		lock_release(&filesys_lock);
 		return -1;
 	}
 	struct file *open_file = filesys_open(file);
 	struct thread *current_thread = thread_current();
 
-	if (open_file == NULL){
+	if (open_file == NULL)
+	{
 		lock_release(&filesys_lock);
 		return -1;
 	}
 	int fd;
 	for (fd = current_thread->last_fd; fd < MAX_FILE_DESCRIPTOR; fd++)
 	{
-		if (current_thread->file_fdt[fd] == NULL){
+		if (current_thread->file_fdt[fd] == NULL)
+		{
 			current_thread->file_fdt[fd] = open_file;
 			current_thread->last_fd = fd;
 			lock_release(&filesys_lock);
@@ -222,72 +228,80 @@ open (const char *file) {
 	// int last_fd = process_add_file(open_file);
 	// if (last_fd == -1){
 	file_close(open_file);
-		// return -1;
+	// return -1;
 	// }
 	// return last_fd;
-	lock_release(&filesys_lock);		
+	lock_release(&filesys_lock);
 	return -1;
 }
 
-int process_add_file (struct file *f){ //FDCOUNT_LIMIT
-/* 파일 객체를 파일 디스크립터 테이블에 추가*/
-    struct thread *curr = thread_current();
-  //파일 디스크립터 테이블에서 비어있는 자리를 찾습니다.
-    while (curr->last_fd < MAX_FILE_DESCRIPTOR  && curr->file_fdt[curr->last_fd] != NULL) {
-        curr->last_fd++;
-    }
-    // 파일 디스크립터 테이블이 꽉 찬 경우 에러를 반환
-    if (curr->last_fd >= MAX_FILE_DESCRIPTOR ) {
-        return -1;
-    }
-    curr->file_fdt[curr->last_fd] = f;
-    return curr->last_fd;
+int process_add_file(struct file *f)
+{ // FDCOUNT_LIMIT
+	/* 파일 객체를 파일 디스크립터 테이블에 추가*/
+	struct thread *curr = thread_current();
+	// 파일 디스크립터 테이블에서 비어있는 자리를 찾습니다.
+	while (curr->last_fd < MAX_FILE_DESCRIPTOR && curr->file_fdt[curr->last_fd] != NULL)
+	{
+		curr->last_fd++;
+	}
+	// 파일 디스크립터 테이블이 꽉 찬 경우 에러를 반환
+	if (curr->last_fd >= MAX_FILE_DESCRIPTOR)
+	{
+		return -1;
+	}
+	curr->file_fdt[curr->last_fd] = f;
+	return curr->last_fd;
 }
 
-
-
-
-
-
-void 
-close (int fd){
-	struct thread* current_thread = thread_current();
-	if(current_thread->file_fdt[fd] == NULL){
+void close(int fd)
+{
+	struct thread *current_thread = thread_current();
+	if (current_thread->file_fdt[fd] == NULL)
+	{
 		return;
 	}
 	file_close(current_thread->file_fdt[fd]);
 	current_thread->file_fdt[fd] = NULL;
 }
 
-int
-read(int fd, void *buffer, unsigned size){
+int read(int fd, void *buffer, unsigned size)
+{
 	lock_acquire(&filesys_lock);
-	if(fd == 0){
+	if (fd == 0)
+	{
 		input_getc();
-		lock_release(&filesys_lock);	
+		lock_release(&filesys_lock);
 		return size;
 	}
 
-	struct thread* current_thread = thread_current();
+	struct thread *current_thread = thread_current();
 	struct file *file_object = current_thread->file_fdt[fd];
+	struct page *page = spt_find_page(&thread_current()->spt, buffer);
+	if (page != NULL && !page->writable)
+	{
+		lock_release(&filesys_lock);
+		exit(-1);
+	}
 	size = file_read(file_object, buffer, size);
-	lock_release(&filesys_lock);	
-	return size;	
+	lock_release(&filesys_lock);
+	return size;
 }
 
-int
-write (int fd, const void *buffer, unsigned size){
+int write(int fd, const void *buffer, unsigned size)
+{
 	lock_acquire(&filesys_lock);
-	struct thread* current_thread = thread_current();
+	struct thread *current_thread = thread_current();
 	struct file *file_object = current_thread->file_fdt[fd];
-	
-	if(fd == 1){
+
+	if (fd == 1)
+	{
 		putbuf(buffer, size);
 		lock_release(&filesys_lock);
 		return size;
 	}
-	
-	if(file_object == NULL){
+
+	if (file_object == NULL)
+	{
 		lock_release(&filesys_lock);
 		return -1;
 	}
@@ -297,25 +311,25 @@ write (int fd, const void *buffer, unsigned size){
 	return size;
 }
 
-int
-filesize(int fd){
+int filesize(int fd)
+{
 
-	struct thread* current_thread = thread_current();
+	struct thread *current_thread = thread_current();
 	struct file *file_object = current_thread->file_fdt[fd];
 	return file_length(file_object);
 }
 
-void
-seek(int fd, unsigned position){
-	struct thread* current_thread = thread_current();
+void seek(int fd, unsigned position)
+{
+	struct thread *current_thread = thread_current();
 	struct file *file_object = current_thread->file_fdt[fd];
 	file_seek(file_object, position);
 }
 
 unsigned
-tell(int fd){
-	struct thread* current_thread = thread_current();
+tell(int fd)
+{
+	struct thread *current_thread = thread_current();
 	struct file *file_object = current_thread->file_fdt[fd];
 	return file_tell(file_object);
 }
-

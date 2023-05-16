@@ -82,8 +82,8 @@ main (void) {
 	thread_init ();
 	console_init ();
 	struct thread* current_thread = thread_current();
-	/* Initialize memory system. */
 	mem_end = palloc_init ();
+	/* Initialize memory system. */
 	malloc_init ();
 	paging_init (mem_end);
 

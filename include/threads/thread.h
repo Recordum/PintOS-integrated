@@ -104,6 +104,7 @@ struct thread {
 	struct list priority_list;
 	struct file** file_fdt;
 	int last_fd;
+	void* user_rsp;
 	struct semaphore fork_sema;
 	struct semaphore wait_sema;
 	struct semaphore exit_sema;

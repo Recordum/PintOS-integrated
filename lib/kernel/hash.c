@@ -30,7 +30,7 @@ hash_init (struct hash *h,
 	h->hash = hash;
 	h->less = less;
 	h->aux = aux;
-
+	
 	if (h->buckets != NULL) {
 		hash_clear (h, NULL);
 		return true;
