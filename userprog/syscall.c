@@ -120,6 +120,12 @@ void syscall_handler(struct intr_frame *f)
 	case SYS_CLOSE:
 		close(ARG0);
 		break;
+	case SYS_MMAP:
+		f->R.rax = mmap(ARG0, ARG1, ARG2, ARG3, ARG4);
+		break;
+	case SYS_MUNMAP:
+		munmap(ARG0);
+		break;
 	default:
 		thread_exit();
 	}
@@ -235,24 +241,6 @@ int open(const char *file)
 	return -1;
 }
 
-int process_add_file(struct file *f)
-{ // FDCOUNT_LIMIT
-	/* 파일 객체를 파일 디스크립터 테이블에 추가*/
-	struct thread *curr = thread_current();
-	// 파일 디스크립터 테이블에서 비어있는 자리를 찾습니다.
-	while (curr->last_fd < MAX_FILE_DESCRIPTOR && curr->file_fdt[curr->last_fd] != NULL)
-	{
-		curr->last_fd++;
-	}
-	// 파일 디스크립터 테이블이 꽉 찬 경우 에러를 반환
-	if (curr->last_fd >= MAX_FILE_DESCRIPTOR)
-	{
-		return -1;
-	}
-	curr->file_fdt[curr->last_fd] = f;
-	return curr->last_fd;
-}
-
 void close(int fd)
 {
 	struct thread *current_thread = thread_current();
@@ -332,4 +320,16 @@ tell(int fd)
 	struct thread *current_thread = thread_current();
 	struct file *file_object = current_thread->file_fdt[fd];
 	return file_tell(file_object);
+}
+
+void *
+mmap (void *addr, size_t length, int writable, int fd, off_t offset) {
+	struct thread *current_thread = thread_current();
+	struct file *file_object = current_thread->file_fdt[fd];
+	return do_mmap(addr, length, writable, file_object, offset);
+}
+
+void
+munmap (void *addr) {
+	return;
 }
