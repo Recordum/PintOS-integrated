@@ -49,17 +49,11 @@ struct page {
 	/* Your implementation */
 	struct hash_elem hash_elem; 
 	bool writable;
+	int page_count;
 	/* Per-type data are binded into the union.
 	 * Each function automatically detects the current union */
 	union {
 		struct uninit_page uninit;
-		/*
-		struct uninit_page {
-		vm_initializer *init;
-		enum vm_type type;
-		void *aux;
-		bool (*page_initializer) (struct page *, enum vm_type, void *kva);
-		};*/
 		struct anon_page anon;
 		struct file_page file;
 #ifdef EFILESYS

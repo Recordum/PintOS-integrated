@@ -26,7 +26,8 @@ int open(const char *file);
 void close(int fd);
 int read(int fd, void *buffer, unsigned size);
 int write(int fd, const void *buffer, unsigned size);
-
+void *mmap (void *addr, size_t length, int writable, int fd, off_t offset); 
+void munmap (void *addr);
 /* System call.
  *
  * Previously system call services was handled by the interrupt handler
@@ -326,10 +327,22 @@ void *
 mmap (void *addr, size_t length, int writable, int fd, off_t offset) {
 	struct thread *current_thread = thread_current();
 	struct file *file_object = current_thread->file_fdt[fd];
-	return do_mmap(addr, length, writable, file_object, offset);
+	struct file *reopen_file = file_reopen(file_object);
+
+	if (pg_round_down(addr) != addr){
+		return NULL;
+	}
+	if (addr == 0){
+		return NULL;
+	}
+	if (length == 0){
+		return NULL;
+	}
+	return do_mmap(addr, length, writable, reopen_file, offset);
 }
 
 void
 munmap (void *addr) {
-	return;
+
+	do_munmap(addr);
 }
