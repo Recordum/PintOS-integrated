@@ -29,7 +29,7 @@ test_main (void)
 		CHECK (wait (child) == -1, "wait for child (should return -1)");
 		quiet = false;
 	}
-
+ 
   /* Verify data again. */
   CHECK (!memcmp (actual, sample, strlen (sample)),
          "checking that mmap'd file still has same data");

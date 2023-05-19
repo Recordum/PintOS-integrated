@@ -62,9 +62,12 @@ file_backed_destroy (struct page *page) {
 	struct file_page *file_page UNUSED = &page->file;
 	struct thread* current_thread = thread_current();
 	if(pml4_is_dirty(current_thread->pml4, page->va)){
+		
 		file_write_at(file_page->load_file, page->va,file_page->size, file_page->offset);
 		pml4_set_dirty(current_thread->pml4, page->va, false);
 	}
+	
+	pml4_clear_page(current_thread->pml4, page->va);
 
 }
 
@@ -82,14 +85,10 @@ bool
 load_file_backed(struct file *file, off_t ofs, uint8_t *upage,
 			 uint32_t read_bytes, uint32_t zero_bytes, bool writable)
 {
-	ASSERT((read_bytes + zero_bytes) % PGSIZE == 0);
-	ASSERT(pg_ofs(upage) == 0);
-	ASSERT(ofs % PGSIZE == 0);
 	void* addr = upage;
+	uint32_t length = read_bytes;
 
-	page_count_init(upage, read_bytes);
-
-	while (read_bytes > 0 || zero_bytes > 0)
+	while (read_bytes > 0)
 	{
 		/* Do calculate how to fill this page.
 		 * We will read PAGE_READ_BYTES bytes from FILE
@@ -113,7 +112,7 @@ load_file_backed(struct file *file, off_t ofs, uint8_t *upage,
 		upage += PGSIZE;
 		ofs += page_read_bytes;
 	}
-	
+	page_count_init(addr, length);
 	return true;
 }
 
@@ -128,7 +127,6 @@ page_count_init(void* addr, uint32_t length){
 
 	first_page = spt_find_page(&thread_current()->spt, addr);
 	first_page->page_count = page_count;
-
 }
 
 /* Do the munmap */
@@ -136,10 +134,9 @@ void
 do_munmap (void *addr) {
 	struct thread* current_thread = thread_current();
 	struct page* first_page = spt_find_page(&current_thread->spt, addr);
-	if(!first_page){
-		return;
-	}
-	for(int i = 0 ;i ++; i < first_page->page_count){
+	// printf("do munmap\n");
+	int page_count = first_page->page_count;
+	for(int i = 0 ;i < page_count; i++){
 		struct page* page = spt_find_page(&current_thread->spt, addr + i * PGSIZE);
 		spt_remove_page(&current_thread->spt, page);
 	}

@@ -20,6 +20,7 @@ test_main (void)
   close (handle);
 
   msg ("validate mmap.");
+  
   if (!memcmp ((void *) 0x10000000, &large[0x1000], 0x1000))
       msg ("validated.");
   else

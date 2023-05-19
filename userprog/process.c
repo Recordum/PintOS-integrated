@@ -167,7 +167,7 @@ duplicate_pte (uint64_t *pte, void *va, void *aux) {
  메모리 복제는 duplicate_pte() 
  */
 static void
-__do_fork (void *aux) {
+ __do_fork (void *aux) {
 	struct thread *parent = (struct thread *) aux;
 	struct thread *current = thread_current ();
 	/* TODO: somehow pass the parent_if. (i.e. process_fork()'s if_) */
@@ -777,6 +777,7 @@ lazy_load_segment(struct page *page, void *aux)
 	uint32_t page_zero_bytes = lazy_load_arg->zero_bytes;
 
 	file_seek(file, ofs);
+	// file_read(file, page->frame->kva, page_read_bytes);
 	if (file_read(file, page->frame->kva, page_read_bytes) != (int)page_read_bytes)
 	{
 		palloc_free_page(page->frame->kva);

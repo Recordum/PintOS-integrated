@@ -68,7 +68,7 @@ bool vm_alloc_page_with_initializer(enum vm_type type, void *upage, bool writabl
 		 * TODO: should modify the field after calling the uninit_new. */
 
 		init_page = (struct page *)malloc(sizeof(struct page));
-		page_initialized(init_page, upage, init, type, aux);
+		page_initialized(init_page, pg_round_down(upage), init, type, aux);
 		init_page->writable = writable;
 		/* TODO: Insert the page into the spt. */
 		return spt_insert_page(spt, init_page);
@@ -119,8 +119,8 @@ bool spt_insert_page(struct supplemental_page_table *spt UNUSED,
 
 void spt_remove_page(struct supplemental_page_table *spt, struct page *page)
 {
+	hash_delete(&spt->spt_hash, &page->hash_elem) ;
 	vm_dealloc_page(page);
-	return true;
 }
 
 /* Get the struct frame, that will be evicted. */
@@ -282,6 +282,7 @@ bool supplemental_page_table_copy(struct supplemental_page_table *dst UNUSED,
 	{
 		struct page *src_page = hash_entry(hash_cur(&hash_ite), struct page, hash_elem);
 		enum vm_type type = src_page->operations->type;
+		struct page* dst_page;
 		bool writable = src_page->writable;
 		if (VM_TYPE(type) == VM_UNINIT)
 		{
@@ -289,12 +290,27 @@ bool supplemental_page_table_copy(struct supplemental_page_table *dst UNUSED,
 											writable, src_page->uninit.init, src_page->uninit.aux);
 			continue;
 		}
-		vm_alloc_page(type, src_page->va, writable);
-		vm_claim_page(src_page->va);
-		memcpy(spt_find_page(dst, src_page->va)->frame->kva, src_page->frame->kva, PGSIZE);
+		
+		if (VM_TYPE(type) == VM_ANON){
+			vm_alloc_page(type, src_page->va, writable);
+			vm_claim_page(src_page->va);
+			dst_page = spt_find_page(dst, src_page->va);
+			memcpy(dst_page->frame->kva, src_page->frame->kva, PGSIZE);
+			continue;
+		}
+		
+		vm_alloc_page_with_initializer(type, src_page->va, writable, NULL, src_page->uninit.aux);
+		dst_page = spt_find_page(dst, src_page->va);
+		memcpy(&dst_page->operations, &src_page->operations, sizeof(int *));
+		memcpy(&dst_page->file, &src_page->file, sizeof(struct file_page));
+		dst_page->file.load_file = file_reopen(src_page->file.load_file);
+		dst_page->frame = src_page->frame;
+		// pml4_set_dirty(thread_current()->pml4, dst_page->va, false);
+		pml4_set_page(thread_current()->pml4, dst_page->va, src_page->frame->kva, dst_page->writable);
 	}
 	return true;
 }
+
 
 /* Free the resource hold by the supplemental page table */
 void supplemental_page_table_kill(struct supplemental_page_table *spt UNUSED)

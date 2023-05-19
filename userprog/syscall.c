@@ -28,6 +28,7 @@ int read(int fd, void *buffer, unsigned size);
 int write(int fd, const void *buffer, unsigned size);
 void *mmap (void *addr, size_t length, int writable, int fd, off_t offset); 
 void munmap (void *addr);
+bool is_validate_mmap(int fd, struct file *file_object, void* addr, size_t length, off_t offset);
 /* System call.
  *
  * Previously system call services was handled by the interrupt handler
@@ -72,8 +73,8 @@ void syscall_handler(struct intr_frame *f)
 	uint64_t ARG1 = f->R.rsi;
 	uint64_t ARG2 = f->R.rdx;
 	uint64_t ARG3 = f->R.r10;
-	uint64_t ARG4 = f->R.r9;
-	uint64_t ARG5 = f->R.r8;
+	uint64_t ARG4 = f->R.r8;
+	uint64_t ARG5 = f->R.r9;
 
 	check_address(rsp);
 
@@ -235,9 +236,7 @@ int open(const char *file)
 	// int last_fd = process_add_file(open_file);
 	// if (last_fd == -1){
 	file_close(open_file);
-	// return -1;
-	// }
-	// return last_fd;
+	
 	lock_release(&filesys_lock);
 	return -1;
 }
@@ -327,22 +326,48 @@ void *
 mmap (void *addr, size_t length, int writable, int fd, off_t offset) {
 	struct thread *current_thread = thread_current();
 	struct file *file_object = current_thread->file_fdt[fd];
-	struct file *reopen_file = file_reopen(file_object);
 
-	if (pg_round_down(addr) != addr){
+	if(!is_validate_mmap(fd, file_object, addr, length, offset)){
 		return NULL;
 	}
-	if (addr == 0){
-		return NULL;
+	
+	if(file_length(file_object) < length){
+		length = file_length(file_object);
 	}
-	if (length == 0){
-		return NULL;
-	}
-	return do_mmap(addr, length, writable, reopen_file, offset);
+	
+	return do_mmap(addr, length, writable, file_reopen(file_object), offset);
 }
+bool
+is_validate_mmap(int fd, struct file *file_object, void* addr, size_t length, off_t offset){
+	struct thread *current_thread = thread_current();
+	struct page* first_page = spt_find_page(&current_thread->spt, addr);
 
+	if (file_object == NULL){
+		return false;
+	}
+	if ((fd < 2 && fd > -1 )|| fd > MAX_FILE_DESCRIPTOR){
+		return false;
+	}
+
+	if(file_length(file_object) == 0 || (int)length <= 0){
+		return false;
+	}
+	if (is_kernel_vaddr(addr)){
+		return false;
+	}
+	
+	if (addr <= 0 || pg_round_down(addr) != addr){
+		return false;
+	}
+	if (offset != pg_round_down(offset)){
+		return false;
+	}
+	if(first_page ){
+		return false;
+	}
+	return true;
+}
 void
 munmap (void *addr) {
-
 	do_munmap(addr);
 }
