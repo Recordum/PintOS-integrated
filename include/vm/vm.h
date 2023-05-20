@@ -3,7 +3,7 @@
 #include <stdbool.h>
 #include "threads/palloc.h"
 #include "lib/kernel/hash.h"
-
+#include "lib/kernel/list.h"
 enum vm_type {
 	/* page not initialized */
 	VM_UNINIT = 0,
@@ -28,6 +28,7 @@ enum vm_type {
 #include "vm/uninit.h"
 #include "vm/anon.h"
 #include "vm/file.h"
+#include 
 #ifdef EFILESYS
 #include "filesys/page_cache.h"
 #endif
@@ -66,7 +67,10 @@ struct page {
 struct frame {
 	void *kva;
 	struct page *page;
+	struct list_elem* frame_elem;
 };
+
+extern struct list frame_table;
 
 /* The function table for page operations.
  * This is one way of implementing "interface" in C.
@@ -90,7 +94,6 @@ struct page_operations {
 struct supplemental_page_table {
 	struct hash spt_hash;
 };
-
 #include "threads/thread.h"
 void supplemental_page_table_init (struct supplemental_page_table *spt);
 bool supplemental_page_table_copy (struct supplemental_page_table *dst,
