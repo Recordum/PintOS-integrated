@@ -27,6 +27,7 @@ vm_anon_init (void) {
 	/* TODO: Set up the swap_disk. */
 	swap_disk = disk_get(1,1);
 	list_init(&swap_table);
+	lock_init(&swap_table_lock);
 	disk_sector_t sector_number = disk_size(swap_disk); //size for swaptable
 	int slot_number = (sector_number + 1) / SECOTR_PER_SLOT;
 	
@@ -82,7 +83,7 @@ anon_swap_out (struct page *page) {
 
 struct slot*
 find_swap_slot(struct page *swap_page){
-
+	lock_acquire(&swap_table_lock);
 	struct list_elem *slot_elem = list_begin(&swap_table);
 	while(true){
 		struct slot *swap_slot = list_entry(slot_elem, struct slot, swap_elem);
@@ -90,6 +91,7 @@ find_swap_slot(struct page *swap_page){
 			PANIC("OVER CAPACITY LIMIT");
 		}
 		if (swap_slot->page == swap_page){
+			lock_release(&swap_table_lock);
 			return swap_slot;
 		}
 		swap_slot = list_next(slot_elem);

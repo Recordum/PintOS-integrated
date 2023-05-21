@@ -26,6 +26,7 @@ void vm_init(void)
 	/* DO NOT MODIFY UPPER LINES. */
 	/* TODO: Your code goes here. */
 	list_init(&frame_table);
+	lock_init(&frame_table_lock);
 }
 
 /* Get the type of the page. This function is useful if you want to know the
@@ -130,13 +131,16 @@ vm_get_victim(void)
 {
 	struct frame *victim = NULL;
 	/* TODO: The policy for eviction is up to you. */
+	lock_acquire(&frame_table_lock);
 	struct list_elem *victim_elem = list_begin(&frame_table);
 	while(true){
 		struct frame *victim = list_entry(victim_elem, struct frame, frame_elem);
 		if (!pml4_is_accessed(thread_current()->pml4, victim->page->va)){
+			lock_release(&frame_table_lock);
 			return victim;
 		}
 		if (victim == list_prev(list_end(&swap_table))){
+			lock_release(&frame_table_lock);
 			return victim;
 		}
 		victim = list_next(victim_elem);
@@ -172,7 +176,9 @@ vm_get_frame(void)
 	}
 
 	frame->page = NULL;
+	lock_acquire(&frame_table_lock);
 	list_push_front(&frame_table, &frame->frame_elem);
+	lock_release(&frame_table_lock);
 	ASSERT(frame != NULL);
 	ASSERT(frame->page == NULL);
 	return frame;
