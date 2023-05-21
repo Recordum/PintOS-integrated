@@ -48,13 +48,15 @@ file_backed_initializer (struct page *page, enum vm_type type, void *kva) {
 static bool
 file_backed_swap_in (struct page *page, void *kva) {
 	struct file_page *file_page UNUSED = &page->file;
-	
+	/*TODO*/
+	mmap
 }
 
 /* Swap out the page by writeback contents to the file. */
 static bool
 file_backed_swap_out (struct page *page) {
 	struct file_page *file_page UNUSED = &page->file;
+	/*TODO*/
 }
 
 /* Destory the file backed page. PAGE will be freed by the caller. */
@@ -62,8 +64,7 @@ static void
 file_backed_destroy (struct page *page) {
 	struct file_page *file_page UNUSED = &page->file;
 	struct thread* current_thread = thread_current();
-	if(pml4_is_dirty(current_thread->pml4, page->va)){
-		
+	if(pml4_is_dirty(current_thread->pml4, page->va)){	
 		file_write_at(file_page->load_file, page->va,file_page->size, file_page->offset);
 		pml4_set_dirty(current_thread->pml4, page->va, false);
 	}

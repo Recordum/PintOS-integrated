@@ -29,9 +29,8 @@ vm_anon_init (void) {
 	list_init(&swap_table);
 	lock_init(&swap_table_lock);
 	disk_sector_t sector_number = disk_size(swap_disk); //size for swaptable
-	int slot_number = (sector_number + 1) / SECOTR_PER_SLOT;
-	
-	for (int i = 1 ; i < slot_number + 1 ; i++){
+	int slot_number = (sector_number) / SECOTR_PER_SLOT;
+	for (int i = 1 ; i <= slot_number ; i++){
 		struct slot *uninit_slot = malloc(sizeof(struct slot));
 		uninit_slot->slot_number = i;
 		uninit_slot->page = NULL;
@@ -56,12 +55,11 @@ anon_swap_in (struct page *page, void *kva) {
 	struct slot *swap_slot= find_swap_slot(page);
 	disk_sector_t sector_number = swap_slot->slot_number * SECOTR_PER_SLOT;
 	int offset = 0;
-	for (int i = sector_number - SECOTR_PER_SLOT ; i< sector_number ; i++){
+	for (int i = sector_number - SECOTR_PER_SLOT ; i < sector_number ; i++){
 		disk_read(swap_disk, i, (char*)kva + (DISK_SECTOR_SIZE * offset));
 		offset ++;
 	}
 	swap_slot->page = NULL;
-
 }
 
 /* Swap out the page by writing contents to the swap disk. */
@@ -77,8 +75,7 @@ anon_swap_out (struct page *page) {
 		disk_write(swap_disk, i, (char*)(page->frame->kva) + (DISK_SECTOR_SIZE * offset));
 		offset ++;
 	}
-	palloc_free_page(page->frame->kva);
-	pml4_clear_page(thread_current()->pml4, page->va);
+	pml4_clear_page(thread_current()->pml4, page->va); // 수정필요
 }
 
 struct slot*
@@ -101,5 +98,9 @@ find_swap_slot(struct page *swap_page){
 static void
 anon_destroy (struct page *page) {
 	struct anon_page *anon_page = &page->anon;
+	/*frame table 삭제*/
+	lock_acquire(&frame_table_lock);
+	list_remove (&page->frame->frame_elem);
+	lock_release(&frame_table_lock);
 	pml4_clear_page(thread_current()->pml4, page->va);
 }

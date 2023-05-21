@@ -102,6 +102,7 @@ spt_find_page(struct supplemental_page_table *spt UNUSED, void *va UNUSED)
 	{
 		return NULL;
 	}
+	free(page);
 	return hash_entry(hash_element, struct page, hash_elem);
 }
 
@@ -178,7 +179,7 @@ vm_get_frame(void)
 		list_pop_front(&frame_table);
 		free(frame);
 		frame = vm_evict_frame();
-		frame->kva = palloc_get_page(PAL_USER);
+		// frame->kva = palloc_get_page(PAL_USER);
 	}
 	frame->page = NULL;
 	
