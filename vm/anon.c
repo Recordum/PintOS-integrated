@@ -60,15 +60,14 @@ anon_swap_out (struct page *page) {
 
 	struct slot *swap_slot= find_swap_slot();
 	swap_slot->page = page;
-	// disk_sector_t sector_number = swap_slot->slot_number * 8;
-	// for (int i = 0 ; i < )
-	// disk_write(swap_disk, )
-	// slot->slot_number를 사용해 slot disk_write*/
-	/*swap_out 된 page free_palloc(frame->kva)*/
-	pml4_clear_page()
-	// palloc_free_page;
-
+	disk_sector_t sector_number = swap_slot->slot_number * 8;
+	for (int i = sector_number - 8 ; i < sector_number ; i++){
+		disk_write(swap_disk, i, page->frame->kva);
+	}
+	palloc_free_page(page->frame->kva);
+	pml4_clear_page(thread_current()->pml4, page->va);
 }
+
 struct slot*
 find_swap_slot(){
 	struct list_elem *slot_elem = list_begin(&swap_table);
@@ -86,4 +85,5 @@ find_swap_slot(){
 static void
 anon_destroy (struct page *page) {
 	struct anon_page *anon_page = &page->anon;
+	pml4_clear_page(thread_current()->pml4, page->va);
 }
