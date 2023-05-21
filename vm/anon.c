@@ -102,5 +102,6 @@ anon_destroy (struct page *page) {
 	lock_acquire(&frame_table_lock);
 	list_remove (&page->frame->frame_elem);
 	lock_release(&frame_table_lock);
+	palloc_free_page(page->frame->kva);
 	pml4_clear_page(thread_current()->pml4, page->va);
 }
