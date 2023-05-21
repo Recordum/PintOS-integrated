@@ -139,6 +139,7 @@ vm_get_victim(void)
 		if (victim == list_prev(list_end(&swap_table))){
 			return victim;
 		}
+		victim = list_next(victim_elem);
 	}
 }
 
