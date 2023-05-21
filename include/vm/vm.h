@@ -28,7 +28,6 @@ enum vm_type {
 #include "vm/uninit.h"
 #include "vm/anon.h"
 #include "vm/file.h"
-#include 
 #ifdef EFILESYS
 #include "filesys/page_cache.h"
 #endif
@@ -62,15 +61,24 @@ struct page {
 #endif
 	};
 };
+struct list swap_table;
+
+struct list frame_table;
 
 /* The representation of "frame" */
 struct frame {
 	void *kva;
 	struct page *page;
-	struct list_elem* frame_elem;
+	struct list_elem frame_elem;
 };
 
-extern struct list frame_table;
+struct slot {
+	int slot_number;
+	struct page *page;
+	struct list_elem swap_elem;
+};
+
+
 
 /* The function table for page operations.
  * This is one way of implementing "interface" in C.

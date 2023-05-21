@@ -21,7 +21,16 @@ static const struct page_operations anon_ops = {
 void
 vm_anon_init (void) {
 	/* TODO: Set up the swap_disk. */
-	swap_disk = NULL;
+	swap_disk = disk_get(1,1);
+	list_init(&swap_table);
+	disk_sector_t sector_number = disk_size(swap_disk); //size for swaptable
+	int slot_number = sector_number / 8;
+	for (int i = 0 ; i < slot_number ; i++){
+		struct slot *uninit_slot = malloc(sizeof(struct slot));
+		uninit_slot->slot_number = i;
+		uninit_slot->page = NULL;
+		list_push_back(&swap_table, &uninit_slot->swap_elem);
+	}
 }
 
 /* Initialize the file mapping */
@@ -38,14 +47,41 @@ anon_initializer (struct page *page, enum vm_type type, void *kva) {
 static bool
 anon_swap_in (struct page *page, void *kva) {
 	struct anon_page *anon_page = &page->anon;
+	/*
+	insert new frame
+	*/
+
 }
 
 /* Swap out the page by writing contents to the swap disk. */
 static bool
 anon_swap_out (struct page *page) {
 	struct anon_page *anon_page = &page->anon;
-}
 
+	struct slot *swap_slot= find_swap_slot();
+	swap_slot->page = page;
+	// disk_sector_t sector_number = swap_slot->slot_number * 8;
+	// for (int i = 0 ; i < )
+	// disk_write(swap_disk, )
+	// slot->slot_number를 사용해 slot disk_write*/
+	/*swap_out 된 page free_palloc(frame->kva)*/
+	pml4_clear_page()
+	// palloc_free_page;
+
+}
+struct slot*
+find_swap_slot(){
+	struct list_elem *slot_elem = list_begin(&swap_table);
+	while(true){
+		struct slot *swap_slot = list_entry(slot_elem, struct slot, swap_elem);
+		if (swap_slot == list_end(&swap_table)){
+			PANIC("OVER CAPACITY LIMIT");
+		}
+		if (swap_slot->page == NULL){
+			return swap_slot;
+		}
+	}
+} 
 /* Destroy the anonymous page. PAGE will be freed by the caller. */
 static void
 anon_destroy (struct page *page) {

@@ -130,7 +130,9 @@ vm_get_victim(void)
 {
 	struct frame *victim = NULL;
 	/* TODO: The policy for eviction is up to you. */
-
+	
+	/*frame table 에서 eviction policy에 맞게 victim 선정*/
+	
 	return victim;
 }
 
@@ -142,7 +144,8 @@ vm_evict_frame(void)
 	struct frame *victim UNUSED = vm_get_victim();
 	/* TODO: swap out the victim and return the evicted frame. */
 
-	return NULL;
+	swap_out(victim->page);
+	return victim;
 }
 
 /* palloc() and get frame. If there is no available page, evict the page
@@ -155,6 +158,13 @@ vm_get_frame(void)
 	struct frame *frame = malloc(sizeof(struct frame));
 	/* TODO: Fill this function. */
 	frame->kva = palloc_get_page(PAL_USER);
+
+	if (frame->kva == NULL){
+		free(frame);
+		frame = vm_evict_frame();
+		frame->kva = palloc_get_page(PAL_USER);
+	}
+
 	frame->page = NULL;
 	ASSERT(frame != NULL);
 	ASSERT(frame->page == NULL);
@@ -166,8 +176,7 @@ static void
 vm_stack_growth(void *addr UNUSED)
 {
 	vm_alloc_page(VM_ANON | VM_MARKER_0, pg_round_down(addr), true);
-	// 	exit(-1);
-	// }
+
 }
 
 /* Handle the fault on write_protected page */
@@ -186,10 +195,6 @@ bool vm_try_handle_fault(struct intr_frame *f UNUSED, void *addr UNUSED,
 	
 	/*syscall */
 	/* TODO: Validate the fault */
-	// if(addr == NULL || is_kernel_vaddr(addr)){
-	// 	return false;
-	// }
-	
 	if (!not_present)
 	{
 		return false;
@@ -243,11 +248,8 @@ bool vm_claim_page(void *va UNUSED)
 	/* TODO: Fill this function */
 	if (page == NULL)
 	{
-		// printf("page == NULL \n");
-		PANIC("TODO");
-		// return false;
+		return false;
 	}
-
 	return vm_do_claim_page(page);
 }
 
@@ -306,7 +308,6 @@ bool supplemental_page_table_copy(struct supplemental_page_table *dst UNUSED,
 		memcpy(&dst_page->file, &src_page->file, sizeof(struct file_page));
 		dst_page->file.load_file = file_reopen(src_page->file.load_file);
 		dst_page->frame = src_page->frame;
-		// pml4_set_dirty(thread_current()->pml4, dst_page->va, false);
 		pml4_set_page(thread_current()->pml4, dst_page->va, src_page->frame->kva, dst_page->writable);
 	}
 	return true;

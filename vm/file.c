@@ -66,7 +66,6 @@ file_backed_destroy (struct page *page) {
 		file_write_at(file_page->load_file, page->va,file_page->size, file_page->offset);
 		pml4_set_dirty(current_thread->pml4, page->va, false);
 	}
-	
 	pml4_clear_page(current_thread->pml4, page->va);
 
 }
