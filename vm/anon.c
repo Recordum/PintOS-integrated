@@ -31,7 +31,7 @@ vm_anon_init (void) {
 	disk_sector_t sector_number = disk_size(swap_disk); //size for swaptable
 	int slot_number = (sector_number + 1) / SECOTR_PER_SLOT;
 	
-	for (int i = 0 ; i < slot_number ; i++){
+	for (int i = 1 ; i < slot_number + 1 ; i++){
 		struct slot *uninit_slot = malloc(sizeof(struct slot));
 		uninit_slot->slot_number = i;
 		uninit_slot->page = NULL;
@@ -94,7 +94,7 @@ find_swap_slot(struct page *swap_page){
 			lock_release(&swap_table_lock);
 			return swap_slot;
 		}
-		swap_slot = list_next(slot_elem);
+		slot_elem = list_next(slot_elem);
 	}
 } 
 /* Destroy the anonymous page. PAGE will be freed by the caller. */
