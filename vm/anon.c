@@ -55,10 +55,12 @@ anon_swap_in (struct page *page, void *kva) {
 	struct slot *swap_slot= find_swap_slot(page);
 	disk_sector_t sector_number = swap_slot->slot_number * SECOTR_PER_SLOT;
 	int offset = 0;
+	// lock_acquire(&swap_table_lock);
 	for (int i = sector_number - SECOTR_PER_SLOT ; i < sector_number ; i++){
 		disk_read(swap_disk, i, (char*)kva + (DISK_SECTOR_SIZE * offset));
 		offset ++;
 	}
+	// lock_release(&swap_table_lock);
 	swap_slot->page = NULL;
 }
 
@@ -101,7 +103,8 @@ anon_destroy (struct page *page) {
 	/*frame table 삭제*/
 	lock_acquire(&frame_table_lock);
 	list_remove (&page->frame->frame_elem);
-	lock_release(&frame_table_lock);
+	// free(page->frame);
 	palloc_free_page(page->frame->kva);
 	pml4_clear_page(thread_current()->pml4, page->va);
+	lock_release(&frame_table_lock);
 }

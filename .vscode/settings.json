@@ -6,6 +6,7 @@
         "process.h": "c",
         "synch.h": "c",
         "*.inc": "c",
-        "lib.h": "c"
+        "lib.h": "c",
+        "main.h": "c"
     }
 }

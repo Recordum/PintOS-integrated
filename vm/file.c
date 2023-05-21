@@ -16,7 +16,7 @@ static void file_backed_destroy (struct page *page);
 bool load_file_backed(struct file *file, off_t ofs, uint8_t *upage,
 			 uint32_t read_bytes, uint32_t zero_bytes, bool writable);
 void page_count_init(void* addr, uint32_t length);
-
+static void write_dirty_page(struct page *page);
 /* DO NOT MODIFY this struct */
 static const struct page_operations file_ops = {
 	.swap_in = file_backed_swap_in,
@@ -49,19 +49,27 @@ static bool
 file_backed_swap_in (struct page *page, void *kva) {
 	struct file_page *file_page UNUSED = &page->file;
 	/*TODO*/
-	mmap
+	lazy_load_segment(page, page->uninit.aux);
+	
 }
 
 /* Swap out the page by writeback contents to the file. */
 static bool
 file_backed_swap_out (struct page *page) {
-	struct file_page *file_page UNUSED = &page->file;
-	/*TODO*/
+	write_dirty_page(page);
 }
 
 /* Destory the file backed page. PAGE will be freed by the caller. */
 static void
 file_backed_destroy (struct page *page) {
+	lock_acquire(&frame_table_lock);
+	write_dirty_page(page);
+	list_remove (&page->frame->frame_elem);
+	lock_release(&frame_table_lock);
+}
+
+static void
+write_dirty_page(struct page *page){
 	struct file_page *file_page UNUSED = &page->file;
 	struct thread* current_thread = thread_current();
 	if(pml4_is_dirty(current_thread->pml4, page->va)){	
@@ -69,9 +77,8 @@ file_backed_destroy (struct page *page) {
 		pml4_set_dirty(current_thread->pml4, page->va, false);
 	}
 	pml4_clear_page(current_thread->pml4, page->va);
-
+	// palloc_free_page(page->frame->kva);
 }
-
 /* Do the mmap */
 void *
 do_mmap (void *addr, size_t length, int writable,
@@ -135,7 +142,6 @@ void
 do_munmap (void *addr) {
 	struct thread* current_thread = thread_current();
 	struct page* first_page = spt_find_page(&current_thread->spt, addr);
-	// printf("do munmap\n");
 	int page_count = first_page->page_count;
 	for(int i = 0 ;i < page_count; i++){
 		struct page* page = spt_find_page(&current_thread->spt, addr + i * PGSIZE);

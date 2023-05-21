@@ -116,7 +116,6 @@ qsort_bytes (unsigned char *buf, size_t size)
   if (!is_sorted (buf, size)) 
     {
       int pivot = pick_pivot (buf, size);
-
       unsigned char *left_half = buf;
       size_t left_size = partition (buf, size, pivot);
       unsigned char *right_half = left_half + left_size;
