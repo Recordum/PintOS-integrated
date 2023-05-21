@@ -130,9 +130,16 @@ vm_get_victim(void)
 {
 	struct frame *victim = NULL;
 	/* TODO: The policy for eviction is up to you. */
-	/*frame table 에서 eviction policy에 맞게 victim 선정*/
-	
-	return victim;
+	struct list_elem *victim_elem = list_begin(&frame_table);
+	while(true){
+		struct frame *victim = list_entry(victim_elem, struct frame, frame_elem);
+		if (!pml4_is_accessed(thread_current()->pml4, victim->page->va)){
+			return victim;
+		}
+		if (victim == list_prev(list_end(&swap_table))){
+			return victim;
+		}
+	}
 }
 
 /* Evict one page and return the corresponding frame.
@@ -142,7 +149,6 @@ vm_evict_frame(void)
 {
 	struct frame *victim UNUSED = vm_get_victim();
 	/* TODO: swap out the victim and return the evicted frame. */
-
 	swap_out(victim->page);
 	return victim;
 }

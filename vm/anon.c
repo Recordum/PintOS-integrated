@@ -92,6 +92,7 @@ find_swap_slot(struct page *swap_page){
 		if (swap_slot->page == swap_page){
 			return swap_slot;
 		}
+		swap_slot = list_next(swap_slot);
 	}
 } 
 /* Destroy the anonymous page. PAGE will be freed by the caller. */
