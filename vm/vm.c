@@ -130,7 +130,6 @@ vm_get_victim(void)
 {
 	struct frame *victim = NULL;
 	/* TODO: The policy for eviction is up to you. */
-	
 	/*frame table 에서 eviction policy에 맞게 victim 선정*/
 	
 	return victim;
@@ -166,6 +165,7 @@ vm_get_frame(void)
 	}
 
 	frame->page = NULL;
+	list_push_front(&frame_table, &frame->frame_elem);
 	ASSERT(frame != NULL);
 	ASSERT(frame->page == NULL);
 	return frame;
