@@ -139,11 +139,12 @@ vm_get_victim(void)
 			lock_release(&frame_table_lock);
 			return victim;
 		}
-		if (victim == list_prev(list_end(&swap_table))){
+		pml4_set_accessed(thread_current()->pml4, victim->page->va, false);
+		if (victim == list_entry(list_prev(list_end(&frame_table)), struct frame, frame_elem)){
 			lock_release(&frame_table_lock);
 			return victim;
 		}
-		victim = list_next(victim_elem);
+		victim_elem = list_next(victim_elem);
 	}
 }
 
@@ -169,16 +170,18 @@ vm_get_frame(void)
 	/* TODO: Fill this function. */
 	frame->kva = palloc_get_page(PAL_USER);
 
+	lock_acquire(&frame_table_lock);
+	list_push_front(&frame_table, &frame->frame_elem);
+	lock_release(&frame_table_lock);
+
 	if (frame->kva == NULL){
+		list_pop_front(&frame_table);
 		free(frame);
 		frame = vm_evict_frame();
 		frame->kva = palloc_get_page(PAL_USER);
 	}
-
 	frame->page = NULL;
-	lock_acquire(&frame_table_lock);
-	list_push_front(&frame_table, &frame->frame_elem);
-	lock_release(&frame_table_lock);
+	
 	ASSERT(frame != NULL);
 	ASSERT(frame->page == NULL);
 	return frame;
