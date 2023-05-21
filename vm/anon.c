@@ -55,12 +55,12 @@ anon_swap_in (struct page *page, void *kva) {
 	struct anon_page *anon_page = &page->anon;
 	struct slot *swap_slot= find_swap_slot(page);
 	disk_sector_t sector_number = swap_slot->slot_number * SECOTR_PER_SLOT;
-
 	int offset = 0;
 	for (int i = sector_number - SECOTR_PER_SLOT ; i< sector_number ; i++){
 		disk_read(swap_disk, i, (char*)kva + (DISK_SECTOR_SIZE * offset));
 		offset ++;
 	}
+	swap_slot->page = NULL;
 
 }
 
