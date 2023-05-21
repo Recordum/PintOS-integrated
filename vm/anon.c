@@ -11,8 +11,6 @@ static void anon_destroy (struct page *page);
 struct slot* find_swap_slot(struct page *swap_page);
 
 enum swap{
- 	SWAP_OUT = false,
-	SWAP_IN  = true,
 	SECOTR_PER_SLOT = PGSIZE/DISK_SECTOR_SIZE,
 };
 /* DO NOT MODIFY this struct */
@@ -75,7 +73,7 @@ anon_swap_out (struct page *page) {
 
 	int offset = 0;
 	for (int i = sector_number - SECOTR_PER_SLOT ; i < sector_number ; i++){
-		disk_write(swap_disk, i, (char*)(page->frame->kva) + (offset * DISK_SECTOR_SIZE));
+		disk_write(swap_disk, i, (char*)(page->frame->kva) + (DISK_SECTOR_SIZE * offset));
 		offset ++;
 	}
 	palloc_free_page(page->frame->kva);
