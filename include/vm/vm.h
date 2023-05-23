@@ -66,6 +66,7 @@ struct list frame_table;
 
 struct lock swap_table_lock;
 struct lock frame_table_lock;
+struct lock lazy_load_lock;
 
 /* The representation of "frame" */
 struct frame {

@@ -10,12 +10,12 @@ struct lazy_load_arg
 	uint32_t read_bytes;
 	uint32_t zero_bytes;
 };
-static bool file_backed_swap_in (struct page *page, void *kva);
-static bool file_backed_swap_out (struct page *page);
-static void file_backed_destroy (struct page *page);
+static bool file_backed_swap_in(struct page *page, void *kva);
+static bool file_backed_swap_out(struct page *page);
+static void file_backed_destroy(struct page *page);
 bool load_file_backed(struct file *file, off_t ofs, uint8_t *upage,
-			 uint32_t read_bytes, uint32_t zero_bytes, bool writable);
-void page_count_init(void* addr, uint32_t length);
+					  uint32_t read_bytes, uint32_t zero_bytes, bool writable);
+void page_count_init(void *addr, uint32_t length);
 static void write_dirty_page(struct page *page);
 /* DO NOT MODIFY this struct */
 static const struct page_operations file_ops = {
@@ -26,74 +26,82 @@ static const struct page_operations file_ops = {
 };
 
 /* The initializer of file vm */
-void
-vm_file_init (void) {
+void vm_file_init(void)
+{
 }
 
 /* Initialize the file backed page */
-bool
-file_backed_initializer (struct page *page, enum vm_type type, void *kva) {
+bool file_backed_initializer(struct page *page, enum vm_type type, void *kva)
+{
 	/* Set up the handler */
 	page->operations = &file_ops;
 
 	struct file_page *file_page = &page->file;
 	struct lazy_load_arg *arg = (struct lazy_load_arg *)page->uninit.aux;
-	file_page->load_file = arg->file;
-	file_page->size = arg->read_bytes;
+	file_page->file = arg->file;
+	file_page->read_bytes = arg->read_bytes;
 	file_page->offset = arg->ofs;
+	// file_page->zero_bytes = arg->zero_bytes;
 	return true;
 }
 
 /* Swap in the page by read contents from the file. */
 static bool
-file_backed_swap_in (struct page *page, void *kva) {
+file_backed_swap_in(struct page *page, void *kva)
+{
 	struct file_page *file_page UNUSED = &page->file;
 	/*TODO*/
 	lazy_load_segment(page, page->uninit.aux);
-	
 }
 
 /* Swap out the page by writeback contents to the file. */
 static bool
-file_backed_swap_out (struct page *page) {
+file_backed_swap_out(struct page *page)
+{
 	write_dirty_page(page);
 }
 
 /* Destory the file backed page. PAGE will be freed by the caller. */
 static void
-file_backed_destroy (struct page *page) {
+file_backed_destroy(struct page *page)
+{
 	lock_acquire(&frame_table_lock);
 	write_dirty_page(page);
-	list_remove (&page->frame->frame_elem);
+	list_remove(&page->frame->frame_elem);
 	lock_release(&frame_table_lock);
 }
 
 static void
-write_dirty_page(struct page *page){
+write_dirty_page(struct page *page)
+{
 	struct file_page *file_page UNUSED = &page->file;
-	struct thread* current_thread = thread_current();
-	if(pml4_is_dirty(current_thread->pml4, page->va)){	
-		file_write_at(file_page->load_file, page->va,file_page->size, file_page->offset);
+	struct thread *current_thread = thread_current();
+	lock_acquire(&filesys_lock);
+	if (pml4_is_dirty(current_thread->pml4, page->va))
+	{
+		file_write_at(file_page->file, page->va, file_page->read_bytes, file_page->offset);
 		pml4_set_dirty(current_thread->pml4, page->va, false);
 	}
+	lock_release(&filesys_lock);
 	pml4_clear_page(current_thread->pml4, page->va);
 	// palloc_free_page(page->frame->kva);
 }
 /* Do the mmap */
 void *
-do_mmap (void *addr, size_t length, int writable,
-		struct file *file, off_t offset) {
-	if(load_file_backed(file, offset, addr, length, 0, writable)){
+do_mmap(void *addr, size_t length, int writable,
+		struct file *file, off_t offset)
+{
+	if (load_file_backed(file, offset, addr, length, 0, writable))
+	{
 		return addr;
 	}
 	return NULL;
 }
 
-bool
-load_file_backed(struct file *file, off_t ofs, uint8_t *upage,
-			 uint32_t read_bytes, uint32_t zero_bytes, bool writable)
+bool load_file_backed(struct file *file, off_t ofs, uint8_t *upage,
+					  uint32_t read_bytes, uint32_t zero_bytes, bool writable)
 {
-	void* addr = upage;
+	void *addr = upage;
 	uint32_t length = read_bytes;
 
 	while (read_bytes > 0)
@@ -110,9 +118,10 @@ load_file_backed(struct file *file, off_t ofs, uint8_t *upage,
 		aux->ofs = ofs;
 		aux->read_bytes = page_read_bytes;
 		aux->zero_bytes = page_zero_bytes;
-		if (!vm_alloc_page_with_initializer(VM_FILE, upage, writable, lazy_load_segment, aux)){
+		if (!vm_alloc_page_with_initializer(VM_FILE, upage, writable, lazy_load_segment, aux))
+		{
 			return false;
-		}	
+		}
 
 		/* Advance. */
 		read_bytes -= page_read_bytes;
@@ -124,12 +133,13 @@ load_file_backed(struct file *file, off_t ofs, uint8_t *upage,
 	return true;
 }
 
-void
-page_count_init(void* addr, uint32_t length){
+void page_count_init(void *addr, uint32_t length)
+{
 	int page_count = length / PGSIZE;
-	struct page* first_page;
+	struct page *first_page;
 
-	if(length % PGSIZE != 0){
+	if (length % PGSIZE != 0)
+	{
 		page_count = length / PGSIZE + 1;
 	}
 
@@ -138,13 +148,14 @@ page_count_init(void* addr, uint32_t length){
 }
 
 /* Do the munmap */
-void
-do_munmap (void *addr) {
-	struct thread* current_thread = thread_current();
-	struct page* first_page = spt_find_page(&current_thread->spt, addr);
+void do_munmap(void *addr)
+{
+	struct thread *current_thread = thread_current();
+	struct page *first_page = spt_find_page(&current_thread->spt, addr);
 	int page_count = first_page->page_count;
-	for(int i = 0 ;i < page_count; i++){
-		struct page* page = spt_find_page(&current_thread->spt, addr + i * PGSIZE);
+	for (int i = 0; i < page_count; i++)
+	{
+		struct page *page = spt_find_page(&current_thread->spt, addr + i * PGSIZE);
 		spt_remove_page(&current_thread->spt, page);
 	}
 }

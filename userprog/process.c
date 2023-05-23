@@ -775,15 +775,17 @@ lazy_load_segment(struct page *page, void *aux)
 	off_t ofs = lazy_load_arg->ofs;
 	uint32_t page_read_bytes = lazy_load_arg->read_bytes;
 	uint32_t page_zero_bytes = lazy_load_arg->zero_bytes;
-
+	
+	lock_acquire(&lazy_load_lock);
 	file_seek(file, ofs);
-	// file_read(file, page->frame->kva, page_read_bytes);
 	if (file_read(file, page->frame->kva, page_read_bytes) != (int)page_read_bytes)
 	{
 		palloc_free_page(page->frame->kva);
 		return false;
 	}
 	memset(page->frame->kva + page_read_bytes, 0, page_zero_bytes);
+	lock_release(&lazy_load_lock);
+	
 	// free(lazy_load_arg);
 	return true;
 }

@@ -10,8 +10,8 @@ bool page_less(const struct hash_elem *a_, const struct hash_elem *b_, void *aux
 void page_initialized(struct page *init_page, void *upage, vm_initializer *init, enum vm_type type, void *aux);
 bool get_initializer_type(enum vm_type type);
 void hash_destructor(struct hash_elem *hash_elem, void *aux);
-bool is_stack_addr(void *addr, void* rsp);
-bool is_validate(void* addr);
+bool is_stack_addr(void *addr, void *rsp);
+bool is_validate(void *addr);
 /* Initializes the virtual memory subsystem by invoking each subsystem's
  * intialize codes. */
 
@@ -122,7 +122,7 @@ bool spt_insert_page(struct supplemental_page_table *spt UNUSED,
 
 void spt_remove_page(struct supplemental_page_table *spt, struct page *page)
 {
-	hash_delete(&spt->spt_hash, &page->hash_elem) ;
+	hash_delete(&spt->spt_hash, &page->hash_elem);
 	vm_dealloc_page(page);
 }
 
@@ -134,14 +134,17 @@ vm_get_victim(void)
 	/* TODO: The policy for eviction is up to you. */
 	lock_acquire(&frame_table_lock);
 	struct list_elem *victim_elem = list_begin(&frame_table);
-	while(true){
+	while (true)
+	{
 		struct frame *victim = list_entry(victim_elem, struct frame, frame_elem);
-		if (!pml4_is_accessed(thread_current()->pml4, victim->page->va)){
+		if (!pml4_is_accessed(thread_current()->pml4, victim->page->va))
+		{
 			lock_release(&frame_table_lock);
 			return victim;
 		}
 		pml4_set_accessed(thread_current()->pml4, victim->page->va, false);
-		if (victim == list_entry(list_prev(list_end(&frame_table)), struct frame, frame_elem)){
+		if (victim == list_entry(list_prev(list_end(&frame_table)), struct frame, frame_elem))
+		{
 			lock_release(&frame_table_lock);
 			return victim;
 		}
@@ -175,14 +178,15 @@ vm_get_frame(void)
 	list_push_front(&frame_table, &frame->frame_elem);
 	lock_release(&frame_table_lock);
 
-	if (frame->kva == NULL){
+	if (frame->kva == NULL)
+	{
 		list_pop_front(&frame_table);
 		free(frame);
 		frame = vm_evict_frame();
 		// frame->kva = palloc_get_page(PAL_USER);
 	}
 	frame->page = NULL;
-	
+
 	ASSERT(frame != NULL);
 	ASSERT(frame->page == NULL);
 	return frame;
@@ -193,7 +197,6 @@ static void
 vm_stack_growth(void *addr UNUSED)
 {
 	vm_alloc_page(VM_ANON | VM_MARKER_0, pg_round_down(addr), true);
-
 }
 
 /* Handle the fault on write_protected page */
@@ -205,26 +208,27 @@ vm_handle_wp(struct page *page UNUSED)
 /* Return true on success */
 bool vm_try_handle_fault(struct intr_frame *f UNUSED, void *addr UNUSED,
 						 bool user UNUSED, bool write UNUSED, bool not_present UNUSED)
-{	
+{
 	struct thread *current_thread = thread_current();
 	struct supplemental_page_table *spt UNUSED = &current_thread->spt;
 	struct page *page = NULL;
-	
+	// printf("addr : %p\n", addr);
+	// printf("user : %d\n", user);
 	/*syscall */
 	/* TODO: Validate the fault */
 	if (!not_present)
 	{
 		return false;
 	}
-	if(user && is_stack_addr(addr, f->rsp))
+	if (user && is_stack_addr(addr, f->rsp))
 	{
 		vm_stack_growth(addr);
 	}
-	if(!user && is_stack_addr(addr, current_thread->user_rsp))
+	if (!user && is_stack_addr(addr, current_thread->user_rsp))
 	{
 		vm_stack_growth(addr);
 	}
-	
+
 	page = spt_find_page(spt, pg_round_down(addr));
 	if (page == NULL)
 	{
@@ -237,15 +241,16 @@ bool vm_try_handle_fault(struct intr_frame *f UNUSED, void *addr UNUSED,
 	/* TODO: Your code goes here */
 	return vm_claim_page(addr);
 }
-bool
-is_stack_addr(void *addr, void* rsp){
-	return USER_STACK - (1<<20) <= rsp - (1<<3)  && rsp - (1<<3) <= addr && addr <= USER_STACK; 
+bool is_stack_addr(void *addr, void *rsp)
+{
+	return USER_STACK - (1 << 20) <= rsp - (1 << 3) && rsp - (1 << 3) <= addr && addr <= USER_STACK;
 }
 
-bool
-is_validate(void* addr){
-	
-	if(addr == NULL || is_kernel_vaddr(addr)){
+bool is_validate(void *addr)
+{
+
+	if (addr == NULL || is_kernel_vaddr(addr))
+	{
 		return false;
 	}
 }
@@ -302,34 +307,37 @@ bool supplemental_page_table_copy(struct supplemental_page_table *dst UNUSED,
 	{
 		struct page *src_page = hash_entry(hash_cur(&hash_ite), struct page, hash_elem);
 		enum vm_type type = src_page->operations->type;
-		struct page* dst_page;
+		struct page *dst_page;
 		bool writable = src_page->writable;
 		if (VM_TYPE(type) == VM_UNINIT)
 		{
 			vm_alloc_page_with_initializer(src_page->uninit.type, src_page->va,
-											writable, src_page->uninit.init, src_page->uninit.aux);
+										   writable, src_page->uninit.init, src_page->uninit.aux);
 			continue;
 		}
-		
-		if (VM_TYPE(type) == VM_ANON){
+
+		if (VM_TYPE(type) == VM_ANON)
+		{
 			vm_alloc_page(type, src_page->va, writable);
 			vm_claim_page(src_page->va);
 			dst_page = spt_find_page(dst, src_page->va);
 			memcpy(dst_page->frame->kva, src_page->frame->kva, PGSIZE);
 			continue;
 		}
-		
+
 		vm_alloc_page_with_initializer(type, src_page->va, writable, NULL, src_page->uninit.aux);
 		dst_page = spt_find_page(dst, src_page->va);
+		// vm_claim_page(src_page->va);
+		// dst_page = spt_find_page(dst, src_page->va);
+		// memcpy(dst_page->frame->kva, src_page->frame->kva, PGSIZE);
 		memcpy(&dst_page->operations, &src_page->operations, sizeof(int *));
 		memcpy(&dst_page->file, &src_page->file, sizeof(struct file_page));
-		dst_page->file.load_file = file_reopen(src_page->file.load_file);
+		dst_page->file.file = file_reopen(src_page->file.file);
 		dst_page->frame = src_page->frame;
 		pml4_set_page(thread_current()->pml4, dst_page->va, src_page->frame->kva, dst_page->writable);
 	}
 	return true;
 }
-
 
 /* Free the resource hold by the supplemental page table */
 void supplemental_page_table_kill(struct supplemental_page_table *spt UNUSED)

@@ -28,6 +28,7 @@ vm_anon_init (void) {
 	swap_disk = disk_get(1,1);
 	list_init(&swap_table);
 	lock_init(&swap_table_lock);
+	lock_init(&lazy_load_lock);
 	disk_sector_t sector_number = disk_size(swap_disk); //size for swaptable
 	int slot_number = (sector_number) / SECOTR_PER_SLOT;
 	for (int i = 1 ; i <= slot_number ; i++){
@@ -55,12 +56,12 @@ anon_swap_in (struct page *page, void *kva) {
 	struct slot *swap_slot= find_swap_slot(page);
 	disk_sector_t sector_number = swap_slot->slot_number * SECOTR_PER_SLOT;
 	int offset = 0;
-	// lock_acquire(&swap_table_lock);
+	lock_acquire(&swap_table_lock);
 	for (int i = sector_number - SECOTR_PER_SLOT ; i < sector_number ; i++){
 		disk_read(swap_disk, i, (char*)kva + (DISK_SECTOR_SIZE * offset));
 		offset ++;
 	}
-	// lock_release(&swap_table_lock);
+	lock_release(&swap_table_lock);
 	swap_slot->page = NULL;
 }
 
@@ -73,10 +74,13 @@ anon_swap_out (struct page *page) {
 	disk_sector_t sector_number = swap_slot->slot_number * SECOTR_PER_SLOT;
 
 	int offset = 0;
+	
+	lock_acquire(&swap_table_lock);
 	for (int i = sector_number - SECOTR_PER_SLOT ; i < sector_number ; i++){
 		disk_write(swap_disk, i, (char*)(page->frame->kva) + (DISK_SECTOR_SIZE * offset));
 		offset ++;
 	}
+	lock_release(&swap_table_lock);
 	pml4_clear_page(thread_current()->pml4, page->va); // 수정필요
 }
 
